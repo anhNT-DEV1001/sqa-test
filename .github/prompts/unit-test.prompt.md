@@ -39,7 +39,7 @@ Generate a structured report encompassing the following sections:
     * List the files/modules THAT DO NOT need testing (referencing the out-of-scope list) and clearly explain why.
 * **1.3. Test Cases (Table Format):**
     Organize grouped by File Name/Class Name. Generate a markdown table with the exact columns:
-    `| Test Case ID | Test Objective | Input | Expected Output | Notes |`
+    `| Test Case ID | File name (Test file name) | Method name (The method to be tested) | Purpose | Input | Expected Output | Test Result| Notes |`
     *(Ensure these align with Section 5.3 of standard QA documentation, focusing on boundary values, valid/invalid inputs, and error states).*
 * **1.4. Project Link:** [Provide placeholder: `[https://github.com/CwtchMH/Academix.git]`]
 * **1.5. Execution Report:** [Provide placeholder template for: Test result summary, total pass/fail counts, and spaces for screenshots].
