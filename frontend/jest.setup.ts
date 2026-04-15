@@ -10,3 +10,29 @@
  */
 
 import '@testing-library/jest-dom'
+
+// Mock Hardware APIs
+Object.defineProperty(global.navigator, 'mediaDevices', {
+  value: {
+    getUserMedia: jest.fn().mockResolvedValue({
+      getTracks: () => [{ stop: jest.fn() }],
+    }),
+  },
+  writable: true,
+});
+
+// Mock HTMLMediaElement methods that are not implemented in JSDOM
+window.HTMLMediaElement.prototype.play = jest.fn().mockResolvedValue(undefined);
+window.HTMLMediaElement.prototype.pause = jest.fn();
+window.HTMLMediaElement.prototype.load = jest.fn();
+
+// Mock Image loading (JSDOM doesn't load images, so onload never fires)
+Object.defineProperty(global.Image.prototype, 'src', {
+  set(src) {
+    if (src) {
+      setTimeout(() => {
+        if (this.onload) this.onload();
+      }, 0);
+    }
+  },
+});

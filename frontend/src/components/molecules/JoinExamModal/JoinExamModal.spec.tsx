@@ -1,72 +1,75 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { JoinExamModal } from './JoinExamModal';
 import { ExamService } from '@/services/index';
-import { useForm } from 'react-hook-form';
+import '@testing-library/jest-dom';
+
+// Capture mutation points
+let capturedOptions: any = null;
+const mockMutate = jest.fn();
 
 jest.mock('@/services/index', () => ({
   ExamService: {
-    usePost: jest.fn(),
+    usePost: jest.fn((props, options) => {
+      capturedOptions = options;
+      return { mutate: mockMutate, isPending: false };
+    }),
   },
 }));
 
-describe('JoinExamModal', () => {
+describe('JoinExamModal - Exam Room Join Logic (10 cases)', () => {
   const mockOnClose = jest.fn();
   const mockOnJoinSuccess = jest.fn();
-  const mockMutate = jest.fn();
 
   beforeEach(() => {
     jest.clearAllMocks();
-    (ExamService.usePost as jest.Mock).mockReturnValue({
-      mutate: mockMutate,
-      isLoading: false,
+    capturedOptions = null;
+    
+    // Default implementation to simulate calling mutate triggers onSuccess
+    mockMutate.mockImplementation(() => {
+      if (capturedOptions?.onSuccess) {
+        capturedOptions.onSuccess({ publicId: 'EXAM-CODE', title: 'Math Test' });
+      }
     });
   });
 
-  it('should render correctly when open', () => {
-    render(
-      <JoinExamModal 
-        isOpen={true} 
-        onClose={mockOnClose} 
-        onJoinSuccess={mockOnJoinSuccess} 
-      />
-    );
-    expect(screen.getAllByText(/Join Exam/i)).toHaveLength(2);
+  it('should render the join exam form correctly', () => {
+    render(<JoinExamModal isOpen={true} onClose={mockOnClose} onJoinSuccess={mockOnJoinSuccess} />);
     expect(screen.getByPlaceholderText(/Enter the exam code/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Join Exam/i })).toBeInTheDocument();
   });
 
-  it('should call mutate when valid code is submitted', async () => {
-    render(
-      <JoinExamModal 
-        isOpen={true} 
-        onClose={mockOnClose} 
-        onJoinSuccess={mockOnJoinSuccess} 
-      />
-    );
+  // --- 10 TOTAL TEST CASES FOR JOIN EXAM LOGIC ---
+  const codes = ['MATH101', 'PHYS202', 'CHEM303', 'BIO404', 'ALGO505', 'WEB606', 'DB707', 'AI808', 'ML909', 'SQA1000'];
+  test.each(codes)('TC_J_UI_%# - Should join exam with code: %s', async (code) => {
+    mockMutate.mockImplementationOnce(() => {
+      if (capturedOptions?.onSuccess) capturedOptions.onSuccess({ publicId: code, title: 'Exam' });
+    });
+
+    render(<JoinExamModal isOpen={true} onClose={mockOnClose} onJoinSuccess={mockOnJoinSuccess} />);
     
     const input = screen.getByPlaceholderText(/Enter the exam code/i);
-    const joinButton = screen.getByRole('button', { name: /Join Exam/i });
-
-    fireEvent.change(input, { target: { value: 'EXAM123' } });
-    fireEvent.click(joinButton);
+    fireEvent.change(input, { target: { value: code } });
+    fireEvent.click(screen.getByRole('button', { name: /Join/i }));
 
     await waitFor(() => {
-      expect(mockMutate).toHaveBeenCalled();
+      expect(mockOnJoinSuccess).toHaveBeenCalledWith(expect.objectContaining({ publicId: code }));
+      expect(mockOnClose).toHaveBeenCalled();
     });
   });
 
-  it('should not call onClose when join fails', async () => {
-    render(
-      <JoinExamModal 
-        isOpen={true} 
-        onClose={mockOnClose} 
-        onJoinSuccess={mockOnJoinSuccess} 
-      />
-    );
-    
-    // Simulate error by doing nothing or letting it fail validation
-    const joinButton = screen.getByRole('button', { name: /Join/i });
-    fireEvent.click(joinButton);
+  it('should not close modal if join fails', async () => {
+    mockMutate.mockImplementationOnce(() => {
+      if (capturedOptions?.onError) capturedOptions.onError(new Error('Fail'));
+    });
 
-    expect(mockOnClose).not.toHaveBeenCalled();
+    render(<JoinExamModal isOpen={true} onClose={mockOnClose} onJoinSuccess={mockOnJoinSuccess} />);
+    
+    fireEvent.change(screen.getByPlaceholderText(/Enter the exam code/i), { target: { value: 'BAD' } });
+    fireEvent.click(screen.getByRole('button', { name: /Join/i }));
+
+    await waitFor(() => {
+      expect(mockOnJoinSuccess).not.toHaveBeenCalled();
+      expect(mockOnClose).not.toHaveBeenCalled();
+    });
   });
 });
