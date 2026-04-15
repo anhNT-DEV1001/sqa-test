@@ -130,7 +130,7 @@ export const FaceVerificationModal = ({
 
       // Ngưỡng (Threshold): Thường là 0.6. 
       // Với bài thi cần bảo mật cao, có thể set 0.5 hoặc 0.45
-      const THRESHOLD = 0.5;
+      const THRESHOLD = 0.6;
 
       if (distance < THRESHOLD) {
         // --- THÀNH CÔNG ---

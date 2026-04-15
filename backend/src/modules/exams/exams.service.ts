@@ -33,7 +33,7 @@ import { log } from 'console';
 import {
   Submission,
   SubmissionDocument,
-} from 'src/database/schemas/submission.schema';
+} from '../../database/schemas/submission.schema';
 import { SubmitExamDto, SubmissionResultDto } from './dto/submission.dto';
 import { User, UserDocument } from '../../database/schemas/user.schema';
 import { ExamResultsResponseDto, ExamResultDto } from './dto/exam-results.dto';
