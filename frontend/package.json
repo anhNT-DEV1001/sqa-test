@@ -6,12 +6,8 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-<<<<<<< HEAD
-    "test": "jest"
-=======
     "test": "jest --verbose",
     "test:coverage": "jest --coverage --verbose"
->>>>>>> f7bbfcc99b54698eb2e55f71104be4f2d5aa686f
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -44,10 +40,7 @@
     "jest-environment-jsdom": "^30.3.0",
     "tailwindcss": "^4",
     "ts-jest": "^29.4.9",
-<<<<<<< HEAD
-=======
     "ts-node": "^10.9.2",
->>>>>>> f7bbfcc99b54698eb2e55f71104be4f2d5aa686f
     "typescript": "^5"
   }
 }
