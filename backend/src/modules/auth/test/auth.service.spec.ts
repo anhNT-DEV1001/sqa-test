@@ -111,6 +111,9 @@ describe('AuthService - User Management Unit Tests', () => {
   });
 
   describe('register', () => {
+    // TC_USER_01: Kiểm tra đăng ký thành công
+    // Test: Người dùng đăng ký với username, email, password hợp lệ khi chưa tồn tại
+    // Expected Output: Trả về user object, accessToken, refreshToken
     it('TC_USER_01: Success Registration', async () => {
       mockUserModel.findOne.mockResolvedValueOnce(null);
       mockUserModel.findOne.mockResolvedValueOnce(null);
@@ -130,6 +133,9 @@ describe('AuthService - User Management Unit Tests', () => {
       expect(result.refreshToken).toBe('mock-jwt-token');
     });
 
+    // TC_USER_02: Kiểm tra đăng ký thất bại khi username đã tồn tại
+    // Test: Người dùng đăng ký với username đã được sử dụng
+    // Expected Output: Throw ConflictException
     it('TC_USER_02: Error Registration (Username Taken)', async () => {
       mockUserModel.findOne.mockResolvedValueOnce({ _id: 'u1', username: 'taken' });
 
@@ -144,6 +150,9 @@ describe('AuthService - User Management Unit Tests', () => {
       ).rejects.toThrow(ConflictException);
     });
 
+    // TC_USER_03: Kiểm tra đăng ký thất bại khi email đã tồn tại
+    // Test: Người dùng đăng ký với email đã được sử dụng
+    // Expected Output: Throw ConflictException
     it('TC_USER_03: Error Registration (Email Taken)', async () => {
       mockUserModel.findOne.mockResolvedValueOnce(null);
       mockUserModel.findOne.mockResolvedValueOnce({ _id: 'u2', email: 'taken@example.com' });
@@ -161,6 +170,9 @@ describe('AuthService - User Management Unit Tests', () => {
   });
 
   describe('login', () => {
+    // TC_USER_04: Kiểm tra đăng nhập thành công
+    // Test: Người dùng đăng nhập với identifier (username/email) và password đúng
+    // Expected Output: Trả về accessToken, refreshToken
     it('TC_USER_04: Success Login', async () => {
       mockUserModel.findOne.mockResolvedValueOnce({
         _id: 'user-01',
@@ -183,6 +195,9 @@ describe('AuthService - User Management Unit Tests', () => {
       expect(result.refreshToken).toBe('mock-jwt-token');
     });
 
+    // TC_USER_05: Kiểm tra đăng nhập thất bại khi user không tồn tại
+    // Test: Người dùng đăng nhập với identifier không tồn tại
+    // Expected Output: Throw UnauthorizedException
     it('TC_USER_05: Error Login (Wrong User)', async () => {
       mockUserModel.findOne.mockResolvedValueOnce(null);
 
@@ -191,6 +206,9 @@ describe('AuthService - User Management Unit Tests', () => {
       ).rejects.toThrow(UnauthorizedException);
     });
 
+    // TC_USER_06: Kiểm tra đăng nhập thất bại khi password sai
+    // Test: Người dùng đăng nhập với password không khớp
+    // Expected Output: Throw UnauthorizedException
     it('TC_USER_06: Error Login (Wrong Pass)', async () => {
       mockUserModel.findOne.mockResolvedValueOnce({
         _id: 'user-01',
@@ -209,6 +227,9 @@ describe('AuthService - User Management Unit Tests', () => {
   });
 
   describe('refreshTokens', () => {
+    // TC_USER_16: Kiểm tra refresh token thất bại khi JWT không hợp lệ
+    // Test: Gửi refresh token không hợp lệ
+    // Expected Output: Throw UnauthorizedException
     it('TC_USER_16: Refresh Token Error (Invalid JWT)', async () => {
       mockJwtService.verifyAsync.mockRejectedValueOnce(new Error('invalid token'));
 
@@ -217,6 +238,9 @@ describe('AuthService - User Management Unit Tests', () => {
       ).rejects.toThrow(UnauthorizedException);
     });
 
+    // TC_USER_17: Kiểm tra refresh token thất bại khi user không tồn tại hoặc thiếu hash
+    // Test: JWT hợp lệ nhưng user không tồn tại hoặc refreshTokenHash bị thiếu
+    // Expected Output: Throw UnauthorizedException
     it('TC_USER_17: Refresh Token Error (User Not Found / Missing Hash)', async () => {
       mockJwtService.verifyAsync.mockResolvedValueOnce({ sub: 'user-01' });
       mockUserModel.findById.mockReturnValue({
@@ -228,6 +252,9 @@ describe('AuthService - User Management Unit Tests', () => {
       ).rejects.toThrow(UnauthorizedException);
     });
 
+    // TC_USER_18: Kiểm tra refresh token thất bại khi hash không khớp
+    // Test: Refresh token không khớp với hash đã lưu
+    // Expected Output: Throw UnauthorizedException
     it('TC_USER_18: Refresh Token Error (Hash Mismatch)', async () => {
       mockJwtService.verifyAsync.mockResolvedValueOnce({ sub: 'user-01' });
       mockUserModel.findById.mockReturnValue({
@@ -244,6 +271,9 @@ describe('AuthService - User Management Unit Tests', () => {
   });
 
   describe('changePassword', () => {
+    // TC_USER_07: Kiểm tra thay đổi mật khẩu thành công
+    // Test: Người dùng thay đổi password với currentPassword đúng và newPassword khác
+    // Expected Output: Trả về message 'Password changed successfully'
     it('TC_USER_07: Change Pwd Success', async () => {
       mockUserModel.findById.mockReturnValue({
         select: jest.fn().mockResolvedValue({ _id: 'user-01', passwordHash: 'old-hash' }),
@@ -264,6 +294,9 @@ describe('AuthService - User Management Unit Tests', () => {
       expect(result).toEqual({ message: 'Password changed successfully' });
     });
 
+    // TC_USER_08: Kiểm tra thay đổi mật khẩu thất bại khi password cũ = password mới
+    // Test: Người dùng đặt newPassword giống với currentPassword
+    // Expected Output: Throw ConflictException
     it('TC_USER_08: Change Pwd Error (Same Pwd)', async () => {
       mockUserModel.findById.mockReturnValue({
         select: jest.fn().mockResolvedValue({ _id: 'user-01', passwordHash: 'old-hash' }),
@@ -280,6 +313,9 @@ describe('AuthService - User Management Unit Tests', () => {
       ).rejects.toThrow(ConflictException);
     });
 
+    // TC_USER_23: Kiểm tra thay đổi mật khẩu thất bại khi currentPassword sai
+    // Test: Người dùng cung cấp currentPassword không khớp
+    // Expected Output: Throw UnauthorizedException
     it('TC_USER_23: Change Pwd Error (Current Password Incorrect)', async () => {
       mockUserModel.findById.mockReturnValue({
         select: jest.fn().mockResolvedValue({ _id: 'user-01', passwordHash: 'old-hash' }),
@@ -296,6 +332,9 @@ describe('AuthService - User Management Unit Tests', () => {
   });
 
   describe('updateProfile', () => {
+    // TC_USER_09: Kiểm tra cập nhật profile thành công
+    // Test: Người dùng cập nhật email, fullName khi không xung đột
+    // Expected Output: Trả về updated user object và message 'Profile updated successfully'
     it('TC_USER_09: Update Profile Success', async () => {
       mockUserModel.findOne.mockResolvedValueOnce(null);
       mockUserModel.findByIdAndUpdate.mockResolvedValueOnce({
@@ -322,6 +361,9 @@ describe('AuthService - User Management Unit Tests', () => {
       expect(result.message).toBe('Profile updated successfully');
     });
 
+    // TC_USER_24: Kiểm tra cập nhật profile thất bại khi email đã tồn tại
+    // Test: Người dùng cập nhật email sang email của user khác
+    // Expected Output: Throw ConflictException
     it('TC_USER_24: Update Profile Error (Email Already Exists)', async () => {
       mockUserModel.findOne.mockResolvedValueOnce({ _id: 'other-user' });
 
@@ -332,6 +374,9 @@ describe('AuthService - User Management Unit Tests', () => {
       ).rejects.toThrow(ConflictException);
     });
 
+    // TC_USER_25: Kiểm tra cập nhật profile thất bại khi user không tồn tại
+    // Test: Người dùng không tồn tại trong database
+    // Expected Output: Throw UnauthorizedException
     it('TC_USER_25: Update Profile Error (User Not Found)', async () => {
       mockUserModel.findOne.mockResolvedValueOnce(null);
       mockUserModel.findByIdAndUpdate.mockResolvedValueOnce(null);
@@ -345,6 +390,9 @@ describe('AuthService - User Management Unit Tests', () => {
   });
 
   describe('requestPasswordReset', () => {
+    // TC_USER_10: Kiểm tra yêu cầu reset mật khẩu thành công
+    // Test: Người dùng yêu cầu reset password với email hợp lệ
+    // Expected Output: Tạo password reset token, gửi email, trả về expiresInMinutes: 15
     it('TC_USER_10: Forgot Pwd Success', async () => {
       mockPasswordResetTokenModel.countDocuments.mockResolvedValue(0);
       mockUserModel.findOne.mockResolvedValueOnce({
@@ -370,6 +418,9 @@ describe('AuthService - User Management Unit Tests', () => {
       expect(result).toEqual({ expiresInMinutes: 15 });
     });
 
+    // TC_USER_19: Kiểm tra yêu cầu reset password thất bại vì vượt quá giới hạn request
+    // Test: Người dùng yêu cầu reset password quá 5 lần trong thời gian quy định
+    // Expected Output: Throw error với status 429 (Too Many Requests)
     it('TC_USER_19: Forgot Pwd Error (Rate Limit Exceeded)', async () => {
       mockPasswordResetTokenModel.countDocuments
         .mockResolvedValueOnce(5)
@@ -386,6 +437,9 @@ describe('AuthService - User Management Unit Tests', () => {
   });
 
   describe('resetPassword', () => {
+    // TC_USER_11: Kiểm tra reset mật khẩu thành công
+    // Test: Người dùng reset password với token hợp lệ và password khớp confirmPassword
+    // Expected Output: Cập nhật passwordHash, xóa refreshTokenHash, đánh dấu token đã sử dụng
     it('TC_USER_11: Reset Pwd Success', async () => {
       const rawToken = 'valid-token';
       const hashedToken = createHash('sha256').update(rawToken).digest('hex');
@@ -420,6 +474,9 @@ describe('AuthService - User Management Unit Tests', () => {
       );
     });
 
+    // TC_USER_20: Kiểm tra reset password thất bại khi password không khớp confirmPassword
+    // Test: password và confirmPassword không giống nhau
+    // Expected Output: Throw BadRequestException
     it('TC_USER_20: Reset Pwd Error (Password Confirmation Mismatch)', async () => {
       await expect(
         service.resetPassword({
@@ -430,6 +487,9 @@ describe('AuthService - User Management Unit Tests', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
+    // TC_USER_21: Kiểm tra reset password thất bại khi token không hợp lệ hoặc hết hạn
+    // Test: Gửi token không tồn tại trong database
+    // Expected Output: Throw UnauthorizedException
     it('TC_USER_21: Reset Pwd Error (Token Invalid/Expired)', async () => {
       mockPasswordResetTokenModel.findOne.mockResolvedValueOnce(null);
 
@@ -442,6 +502,9 @@ describe('AuthService - User Management Unit Tests', () => {
       ).rejects.toThrow(UnauthorizedException);
     });
 
+    // TC_USER_22: Kiểm tra reset password thất bại khi user liên kết với token không tồn tại
+    // Test: Token hợp lệ nhưng user ID không tồn tại
+    // Expected Output: Throw NotFoundException
     it('TC_USER_22: Reset Pwd Error (Linked User Not Found)', async () => {
       mockPasswordResetTokenModel.findOne.mockResolvedValueOnce({
         _id: 'reset-token-02',
@@ -463,6 +526,9 @@ describe('AuthService - User Management Unit Tests', () => {
   });
 
   describe('validateProfileImage', () => {
+    // TC_USER_12: Kiểm tra xác thực hình ảnh profile thành công
+    // Test: Gửi base64 image hợp lệ, Gemini API trả về isValid: true
+    // Expected Output: Trả về { success: true, message: 'Image is valid.' }
     it('TC_USER_12: Validation Image Success', async () => {
       mockHttpService.post.mockReturnValue(
         of({
@@ -491,6 +557,9 @@ describe('AuthService - User Management Unit Tests', () => {
       expect(mockHttpService.post).toHaveBeenCalledTimes(1);
     });
 
+    // TC_USER_13: Kiểm tra xác thực hình ảnh profile thất bại
+    // Test: Gemini API trả về isValid: false (không detect được khuôn mặt)
+    // Expected Output: Throw BadRequestException
     it('TC_USER_13: Validation Image Failed', async () => {
       mockHttpService.post.mockReturnValue(
         of({
@@ -515,12 +584,18 @@ describe('AuthService - User Management Unit Tests', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
+    // TC_USER_30: Kiểm tra xác thực hình ảnh thất bại khi base64 data URL không hợp lệ
+    // Test: Gửi string không phải base64 data URL
+    // Expected Output: Throw BadRequestException
     it('TC_USER_30: Validation Image Error (Invalid Base64 Data URL)', async () => {
       await expect(service.validateProfileImage('invalid-image')).rejects.toThrow(
         BadRequestException,
       );
     });
 
+    // TC_USER_31: Kiểm tra xác thực hình ảnh thất bại khi Gemini API Key bị thiếu
+    // Test: GEMINI_API_KEY từ config service là undefined
+    // Expected Output: Throw InternalServerErrorException
     it('TC_USER_31: Validation Image Error (Missing Gemini API Key)', async () => {
       mockConfigService.get.mockImplementation((key: string) => {
         if (key === 'GEMINI_API_KEY') return undefined;
@@ -535,6 +610,9 @@ describe('AuthService - User Management Unit Tests', () => {
   });
 
   describe('verifyFace', () => {
+    // TC_USER_14: Kiểm tra xác minh khuôn mặt thành công
+    // Test: Lấy profile image từ URL, so sánh với webcam image, Gemini API trả về true
+    // Expected Output: Trả về { success: true, message: 'Face verified successfully.' }
     it('TC_USER_14: Verify Face Success', async () => {
       mockHttpService.get.mockReturnValue(
         of({
@@ -569,6 +647,9 @@ describe('AuthService - User Management Unit Tests', () => {
       expect(mockHttpService.post).toHaveBeenCalledTimes(1);
     });
 
+    // TC_USER_15: Kiểm tra xác minh khuôn mặt thất bại
+    // Test: Khuôn mặt trong webcam image không khớp với profile image
+    // Expected Output: Trả về { success: false, message: 'Face does not match profile. Verification failed.' }
     it('TC_USER_15: Verify Face Failed', async () => {
       mockHttpService.get.mockReturnValue(
         of({
@@ -601,6 +682,9 @@ describe('AuthService - User Management Unit Tests', () => {
       });
     });
 
+    // TC_USER_26: Kiểm tra xác minh khuôn mặt thất bại khi profile image bị thiếu
+    // Test: User object không có imageUrl
+    // Expected Output: Throw BadRequestException
     it('TC_USER_26: Verify Face Error (Profile Image Missing)', async () => {
       await expect(
         service.verifyFace(
@@ -615,6 +699,9 @@ describe('AuthService - User Management Unit Tests', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
+    // TC_USER_27: Kiểm tra xác minh khuôn mặt thất bại khi webcam image format không hợp lệ
+    // Test: webcamImage là string rỗng
+    // Expected Output: Throw BadRequestException
     it('TC_USER_27: Verify Face Error (Webcam Image Format Invalid)', async () => {
       await expect(
         service.verifyFace(
@@ -630,6 +717,9 @@ describe('AuthService - User Management Unit Tests', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
+    // TC_USER_28: Kiểm tra xác minh khuôn mặt thất bại khi không thể fetch profile image
+    // Test: HttpService.get() ném lỗi 'fetch failed'
+    // Expected Output: Throw InternalServerErrorException
     it('TC_USER_28: Verify Face Error (Cannot Fetch Profile Image)', async () => {
       mockHttpService.get.mockImplementation(() => {
         throw new Error('fetch failed');
@@ -649,6 +739,9 @@ describe('AuthService - User Management Unit Tests', () => {
       ).rejects.toThrow(InternalServerErrorException);
     });
 
+    // TC_USER_29: Kiểm tra xác minh khuôn mặt thất bại khi Gemini API trả về 403 Forbidden
+    // Test: HttpService.post() ném lỗi với status 403
+    // Expected Output: Throw InternalServerErrorException
     it('TC_USER_29: Verify Face Error (Gemini API Forbidden 403)', async () => {
       mockHttpService.get.mockReturnValue(
         of({
@@ -677,6 +770,9 @@ describe('AuthService - User Management Unit Tests', () => {
       ).rejects.toThrow(InternalServerErrorException);
     });
 
+    // TC_USER_32: Kiểm tra xác minh khuôn mặt thất bại khi webcam payload không phải base64 format
+    // Test: webcamImage là plain text, không phải data URL format
+    // Expected Output: Throw BadRequestException
     it('TC_USER_32: Verify Face Error (Malformed Non-Base64 Webcam Payload)', async () => {
       await expect(
         service.verifyFace(
