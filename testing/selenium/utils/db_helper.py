@@ -8,7 +8,11 @@
 
 from pymongo import MongoClient
 from config import MONGODB_URI, DB_NAME
+import logging
 
+# Cấu hình logging cơ bản cho console
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
+logger = logging.getLogger("DB_ROLLBACK")
 
 class MongoDBHelper:
     """Helper class cho thao tác MongoDB trong test."""
@@ -33,12 +37,18 @@ class MongoDBHelper:
 
     def delete_user_by_username(self, username: str):
         """Xóa user test theo username (rollback after register test)."""
+        logger.info(f"🔄 [ROLLBACK] Thực hiện xóa user có username: '{username}'")
         result = self.db.users.delete_one({"username": username})
+        if result.deleted_count > 0:
+            logger.info(f"✅ [ROLLBACK] Đã xóa thành công {result.deleted_count} user '{username}'")
         return result.deleted_count
 
     def delete_user_by_email(self, email: str):
         """Xóa user test theo email (rollback)."""
+        logger.info(f"🔄 [ROLLBACK] Thực hiện xóa user có email: '{email}'")
         result = self.db.users.delete_one({"email": email})
+        if result.deleted_count > 0:
+            logger.info(f"✅ [ROLLBACK] Đã xóa thành công {result.deleted_count} user '{email}'")
         return result.deleted_count
 
     # --- Course Operations ---
@@ -48,7 +58,10 @@ class MongoDBHelper:
 
     def delete_course_by_name(self, course_name: str):
         """Xóa course test (rollback)."""
+        logger.info(f"🔄 [ROLLBACK] Thực hiện xóa course có tên: '{course_name}'")
         result = self.db.courses.delete_one({"courseName": course_name})
+        if result.deleted_count > 0:
+            logger.info(f"✅ [ROLLBACK] Đã xóa thành công {result.deleted_count} course '{course_name}'")
         return result.deleted_count
 
     # --- Exam Operations ---
@@ -58,7 +71,10 @@ class MongoDBHelper:
 
     def delete_exam_by_title(self, title: str):
         """Xóa exam test (rollback)."""
+        logger.info(f"🔄 [ROLLBACK] Thực hiện xóa exam có title: '{title}'")
         result = self.db.exams.delete_one({"title": title})
+        if result.deleted_count > 0:
+            logger.info(f"✅ [ROLLBACK] Đã xóa thành công {result.deleted_count} exam '{title}'")
         return result.deleted_count
 
     # --- Submission Operations ---
@@ -71,8 +87,11 @@ class MongoDBHelper:
 
     def delete_submission(self, student_id: str, exam_id: str):
         """Xóa submission test (rollback)."""
+        logger.info(f"🔄 [ROLLBACK] Thực hiện xóa submission của student: '{student_id}' cho exam '{exam_id}'")
         result = self.db.submissions.delete_one({
             "studentId": student_id,
             "examId": exam_id
         })
+        if result.deleted_count > 0:
+            logger.info(f"✅ [ROLLBACK] Đã xóa thành công {result.deleted_count} submission")
         return result.deleted_count

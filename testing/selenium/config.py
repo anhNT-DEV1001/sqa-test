@@ -21,7 +21,7 @@ STUDENT_PASSWORD = "@Tuananh10012004"
 
 # --- Browser Settings ---
 BROWSER = "chrome"           # chrome | edge
-HEADLESS = False             # True = chạy không hiện trình duyệt
+HEADLESS = True            # True = chạy không hiện trình duyệt
 IMPLICIT_WAIT = 10           # seconds
 PAGE_LOAD_TIMEOUT = 30       # seconds
 SCREENSHOT_ON_FAILURE = True # Chụp màn hình khi test fail
