@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ==============================================================================
+     JMETER TEST PLAN — Academix Platform Performance Testing
+     ==============================================================================
+     File này là placeholder JMX. Thành viên phụ trách Part 3 sẽ:
+       1. Mở file này bằng JMeter GUI
+       2. Thêm các Thread Groups theo kế hoạch
+       3. Cấu hình HTTP Requests, Assertions, Listeners
+     
+     Xem chi tiết: .github/prompts/tool-test.prompt.md (Part 3)
+     
+     4 Thread Groups cần tạo:
+       1. Login Load Test (50 VUs, ramp-up 10s)
+       2. API Endpoint Stress (100 VUs, ramp-up 20s)
+       3. Concurrent Exam Taking (30 VUs, ramp-up 5s)
+       4. Certificate Verification (200 VUs, ramp-up 30s)
+     ============================================================================== -->
+<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.3">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="Academix Performance Test" enabled="true">
+      <stringProp name="TestPlan.comments">Performance testing cho Academix Platform</stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
+    </TestPlan>
+    <hashTree>
+      <!-- TODO: Thêm Thread Groups ở đây bằng JMeter GUI -->
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>

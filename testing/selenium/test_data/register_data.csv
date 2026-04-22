@@ -1,0 +1,9 @@
+fullName,username,email,password,confirmPassword,role,expected_result,description
+Test Student Auto,test_student_auto,test_student_auto@test.com,@TestPass123,@TestPass123,student,success,Register student thành công
+Test Teacher Auto,test_teacher_auto,test_teacher_auto@test.com,@TestPass123,@TestPass123,teacher,success,Register teacher thành công
+Duplicate User,anhnt36,anhnt36@existing.com,@TestPass123,@TestPass123,student,error_duplicate,Email đã tồn tại
+Duplicate Username,test_dup,anhnt36@test.com,@TestPass123,@TestPass123,student,error_duplicate,Username đã tồn tại
+Short Pass,short_pass_user,shortpass@test.com,123,123,student,validation_error,Password quá ngắn
+Mismatch,mismatch_user,mismatch@test.com,@TestPass123,@DifferentPass,student,validation_error,Password không khớp
+Bad Email,bad_email_user,not-an-email,@TestPass123,@TestPass123,student,validation_error,Email sai format
+,,,,,,validation_error,Trống required fields
