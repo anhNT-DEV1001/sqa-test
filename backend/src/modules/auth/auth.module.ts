@@ -22,7 +22,9 @@ import { MailService } from './mail.service';
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
         secret: configService.get<string>('jwt.secret'),
-        signOptions: { expiresIn: configService.get<string>('jwt.expiresIn') },
+        signOptions: {
+          expiresIn: configService.get<string>('jwt.expiresIn') as any,
+        },
       }),
       inject: [ConfigService],
     }),
@@ -36,4 +38,4 @@ import { MailService } from './mail.service';
   providers: [AuthService, JwtStrategy, MailService],
   exports: [AuthService],
 })
-export class AuthModule {}
+export class AuthModule { }
