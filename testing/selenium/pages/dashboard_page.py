@@ -2,13 +2,13 @@
 # DASHBOARD PAGE — Page Object cho trang Dashboard
 # ==============================================================================
 # URL: /dashboard/teacher hoặc /dashboard/student
-# TODO: Thành viên phụ trách cập nhật locators
+# Tất cả locators dùng XPath
 # ==============================================================================
 
 from selenium.webdriver.common.by import By
 from pages.base_page import BasePage
 from config import FRONTEND_URL
-
+import time
 
 class DashboardPage(BasePage):
     """Page Object cho trang Dashboard."""
@@ -16,11 +16,10 @@ class DashboardPage(BasePage):
     TEACHER_URL = f"{FRONTEND_URL}/dashboard/teacher"
     STUDENT_URL = f"{FRONTEND_URL}/dashboard/student"
 
-    # --- Locators ---
-    # TODO: Cập nhật locators theo UI thực tế
-    STATS_CARDS = (By.CSS_SELECTOR, ".stats-card, .ant-card")
-    SIDEBAR_MENU = (By.CSS_SELECTOR, ".ant-menu-item")
-    LOGOUT_BUTTON = (By.CSS_SELECTOR, "[data-testid='logout'], .logout-btn")
+    # --- Locators (XPath) ---
+    STATS_CARDS      = (By.XPATH, "//div[contains(., 'Total Students') or contains(., 'Active Exams')]")
+    USER_AVATAR      = (By.XPATH, "//*[contains(@class, 'ant-avatar')]")
+    LOGOUT_MENU_ITEM = (By.XPATH, "//span[text()='Logout']/ancestor::li | //*[contains(text(), 'Logout')]")
 
     # --- Actions ---
     def open_teacher_dashboard(self):
@@ -37,10 +36,12 @@ class DashboardPage(BasePage):
 
     def click_sidebar_item(self, menu_text: str):
         """Click vào menu item trên sidebar."""
-        # TODO: Implement navigation qua sidebar
-        pass
+        # Dùng XPath để tìm menu item theo text
+        locator = (By.XPATH, f"//span[text()='{menu_text}']/ancestor::a | //*[text()='{menu_text}']")
+        self.click(*locator)
 
     def logout(self):
-        """Thực hiện logout."""
-        # TODO: Implement logout flow
-        pass
+        """Thực hiện logout qua UserMenu."""
+        self.click(*self.USER_AVATAR)
+        time.sleep(0.5) # Chờ dropdown hiện ra
+        self.click(*self.LOGOUT_MENU_ITEM)

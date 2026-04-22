@@ -19,7 +19,9 @@ import { AuthModule } from '../auth/auth.module';
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
         secret: configService.get<string>('jwt.secret') ?? 'fallback-secret',
-        signOptions: { expiresIn: configService.get<string>('jwt.expiresIn') },
+        signOptions: {
+          expiresIn: configService.get<string>('jwt.expiresIn') as any,
+        },
       }),
       inject: [ConfigService],
     }),
@@ -31,4 +33,4 @@ import { AuthModule } from '../auth/auth.module';
   providers: [NotificationsService, NotificationsGateway],
   exports: [NotificationsService],
 })
-export class NotificationsModule {}
+export class NotificationsModule { }
