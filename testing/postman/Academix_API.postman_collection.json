@@ -1,0 +1,52 @@
+# ==============================================================================
+# POSTMAN API TEST COLLECTION — Academix Platform
+# ==============================================================================
+# File này là placeholder. Thành viên phụ trách Part 2 sẽ:
+#   1. Import file này vào Postman
+#   2. Hoặc tạo collection mới trong Postman rồi export ra đây
+#
+# Xem kế hoạch chi tiết: .github/prompts/tool-test.prompt.md (Part 2)
+#
+# Tổng: 42 API test cases across 5 folders:
+#   - Folder 1: Auth APIs (11 TCs)
+#   - Folder 2: Course APIs (7 TCs)
+#   - Folder 3: Exam APIs (12 TCs)
+#   - Folder 4: Certificate APIs (7 TCs)
+#   - Folder 5: Dashboard & Notifications (5 TCs)
+#
+# LƯU Ý: Mọi test script trong Postman PHẢI có comment rõ ràng!
+# ==============================================================================
+{
+  "info": {
+    "name": "Academix API Tests",
+    "description": "API Test Collection cho Academix Platform.\nXem chi tiết: .github/prompts/tool-test.prompt.md",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01 - Auth APIs",
+      "description": "11 test cases: Register, Login, Profile, Change Password, Refresh Token",
+      "item": []
+    },
+    {
+      "name": "02 - Course APIs",
+      "description": "7 test cases: CRUD courses, search, delete",
+      "item": []
+    },
+    {
+      "name": "03 - Exam APIs",
+      "description": "12 test cases: CRUD exams, join, take, submit, results",
+      "item": []
+    },
+    {
+      "name": "04 - Certificate APIs",
+      "description": "7 test cases: Issue, list, verify, revoke, lookup",
+      "item": []
+    },
+    {
+      "name": "05 - Dashboard & Notifications",
+      "description": "5 test cases: Teacher dashboard, notifications",
+      "item": []
+    }
+  ]
+}

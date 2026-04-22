@@ -1,0 +1,8 @@
+identifier,password,expected_result,description
+anhnt39,@Tuananh10012004,success_teacher,Login thành công - Teacher
+anhnt36,@Tuananh10012004,success_student,Login thành công - Student
+anhnt36,wrong_password_123,error,Login sai password
+fake_user_999,any_password,error,Login user không tồn tại
+,@Tuananh10012004,validation_error,Login để trống username
+anhnt36,,validation_error,Login để trống password
+,,validation_error,Login để trống cả 2

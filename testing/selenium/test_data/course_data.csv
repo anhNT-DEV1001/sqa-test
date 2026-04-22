@@ -1,0 +1,6 @@
+courseName,action,expected_result,description
+Selenium Test Course 001,create,success,Tạo course mới
+,create,validation_error,Tạo course tên trống
+Selenium Test Course Updated,edit,success,Sửa tên course
+Selenium Test Course 001,delete,success,Xóa course
+math,search,filtered,Tìm kiếm course
