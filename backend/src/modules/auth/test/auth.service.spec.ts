@@ -26,6 +26,7 @@ jest.mock('argon2', () => ({
 describe('AuthService - User Management Unit Tests', () => {
   let service: AuthService;
 
+  // Mock model cho các thao tác đọc/ghi user trong từng service method.
   const mockUserModel = {
     findOne: jest.fn(),
     findById: jest.fn(),
@@ -33,6 +34,7 @@ describe('AuthService - User Management Unit Tests', () => {
     save: jest.fn(),
   };
 
+  // Mock constructor để giả lập `new this.userModel(...)` trong service.
   class MockUserModel {
     constructor(private readonly data: any) {
       Object.assign(this, data);
@@ -45,6 +47,7 @@ describe('AuthService - User Management Unit Tests', () => {
     static findByIdAndUpdate = mockUserModel.findByIdAndUpdate;
   }
 
+  // Mock model cho password reset flow.
   const mockPasswordResetTokenModel = {
     create: jest.fn(),
     findOne: jest.fn(),
@@ -76,6 +79,10 @@ describe('AuthService - User Management Unit Tests', () => {
   };
 
   beforeEach(async () => {
+    // Cơ chế "rollback" cho unit test:
+    // Các test này không ghi DB thật mà chỉ thao tác trên mock.
+    // `jest.resetAllMocks()` được dùng để reset toàn bộ state mock giữa các test,
+    // tránh rò rỉ dữ liệu từ test trước sang test sau.
     jest.resetAllMocks();
 
     (argon2.hash as jest.Mock).mockResolvedValue('hashed-value');
@@ -110,6 +117,7 @@ describe('AuthService - User Management Unit Tests', () => {
     service = module.get<AuthService>(AuthService);
   });
 
+  // ===== SERVICE: REGISTER =====
   describe('register', () => {
     // TC_USER_01: Kiểm tra đăng ký thành công
     // Test: Người dùng đăng ký với username, email, password hợp lệ khi chưa tồn tại
@@ -169,6 +177,7 @@ describe('AuthService - User Management Unit Tests', () => {
     });
   });
 
+  // ===== SERVICE: LOGIN =====
   describe('login', () => {
     // TC_USER_04: Kiểm tra đăng nhập thành công
     // Test: Người dùng đăng nhập với identifier (username/email) và password đúng
@@ -226,6 +235,7 @@ describe('AuthService - User Management Unit Tests', () => {
     });
   });
 
+  // ===== SERVICE: REFRESH TOKEN =====
   describe('refreshTokens', () => {
     // TC_USER_16: Kiểm tra refresh token thất bại khi JWT không hợp lệ
     // Test: Gửi refresh token không hợp lệ
@@ -270,6 +280,7 @@ describe('AuthService - User Management Unit Tests', () => {
     });
   });
 
+  // ===== SERVICE: CHANGE PASSWORD =====
   describe('changePassword', () => {
     // TC_USER_07: Kiểm tra thay đổi mật khẩu thành công
     // Test: Người dùng thay đổi password với currentPassword đúng và newPassword khác
@@ -331,6 +342,7 @@ describe('AuthService - User Management Unit Tests', () => {
     });
   });
 
+  // ===== SERVICE: UPDATE PROFILE =====
   describe('updateProfile', () => {
     // TC_USER_09: Kiểm tra cập nhật profile thành công
     // Test: Người dùng cập nhật email, fullName khi không xung đột
@@ -389,6 +401,7 @@ describe('AuthService - User Management Unit Tests', () => {
     });
   });
 
+  // ===== SERVICE: FORGOT PASSWORD =====
   describe('requestPasswordReset', () => {
     // TC_USER_10: Kiểm tra yêu cầu reset mật khẩu thành công
     // Test: Người dùng yêu cầu reset password với email hợp lệ
@@ -436,6 +449,7 @@ describe('AuthService - User Management Unit Tests', () => {
     });
   });
 
+  // ===== SERVICE: RESET PASSWORD =====
   describe('resetPassword', () => {
     // TC_USER_11: Kiểm tra reset mật khẩu thành công
     // Test: Người dùng reset password với token hợp lệ và password khớp confirmPassword
@@ -525,6 +539,7 @@ describe('AuthService - User Management Unit Tests', () => {
     });
   });
 
+  // ===== SERVICE: VALIDATE PROFILE IMAGE =====
   describe('validateProfileImage', () => {
     // TC_USER_12: Kiểm tra xác thực hình ảnh profile thành công
     // Test: Gửi base64 image hợp lệ, Gemini API trả về isValid: true
@@ -609,6 +624,7 @@ describe('AuthService - User Management Unit Tests', () => {
     });
   });
 
+  // ===== SERVICE: VERIFY FACE =====
   describe('verifyFace', () => {
     // TC_USER_14: Kiểm tra xác minh khuôn mặt thành công
     // Test: Lấy profile image từ URL, so sánh với webcam image, Gemini API trả về true
@@ -770,10 +786,10 @@ describe('AuthService - User Management Unit Tests', () => {
       ).rejects.toThrow(InternalServerErrorException);
     });
 
-    // TC_USER_32: Kiểm tra xác minh khuôn mặt thất bại khi webcam payload không phải base64 format
-    // Test: webcamImage là plain text, không phải data URL format
+    // TC_USER_32: Kiểm tra xác minh khuôn mặt thất bại khi webcam payload thiếu dữ liệu base64
+    // Test: webcamImage là data URL nhưng phần dữ liệu base64 rỗng
     // Expected Output: Throw BadRequestException
-    it('TC_USER_32: Verify Face Error (Malformed Non-Base64 Webcam Payload)', async () => {
+    it('TC_USER_32: Verify Face Error (Empty Webcam Base64 Payload)', async () => {
       await expect(
         service.verifyFace(
           {
@@ -783,10 +799,9 @@ describe('AuthService - User Management Unit Tests', () => {
             role: 'student',
             imageUrl: 'https://example.com/profile.jpg',
           },
-          { webcamImage: 'plain-text-not-data-url' },
+          { webcamImage: 'data:image/jpeg;base64,' },
         ),
       ).rejects.toThrow(BadRequestException);
     });
   });
-
 });
