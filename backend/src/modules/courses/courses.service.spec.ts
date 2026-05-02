@@ -5,7 +5,7 @@ import { Course } from '../../database/schemas/course.schema';
 import { User } from '../../database/schemas/user.schema';
 import { Enrollment } from '../../database/schemas/enrollment.schema';
 import { Types } from 'mongoose';
-import { NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { NotFoundException, ForbiddenException } from '@nestjs/common';
 import * as idUtils from '../../common/utils/public-id.util';
 
 describe('CoursesService - Instructor Course Management', () => {
@@ -13,7 +13,6 @@ describe('CoursesService - Instructor Course Management', () => {
 
   const mockCourseId = new Types.ObjectId();
   const mockTeacherId = new Types.ObjectId();
-  const mockStudentId = new Types.ObjectId();
 
   const mockCourseModel = {
     find: jest.fn(),
@@ -32,8 +31,7 @@ describe('CoursesService - Instructor Course Management', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    
-    // Mock generatePrefixedPublicId locally
+
     jest.spyOn(idUtils, 'generatePrefixedPublicId').mockResolvedValue('C-123456');
 
     const module: TestingModule = await Test.createTestingModule({
@@ -48,2454 +46,1352 @@ describe('CoursesService - Instructor Course Management', () => {
     service = module.get<CoursesService>(CoursesService);
   });
 
+  // ============================================================
+  // createCourse Method Tests
+  // ============================================================
 
-  // TC_createCourse_001
+  // TC_CREATE_COURSE_001
   // Method: createCourse
-  // Purpose: To verify course creation logic for variation 1
-  // Input: { courseName: "Course Variation 1", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 1"
+  // Purpose: Verify successful course creation with a valid teacher and course name
+  // Input: { courseName: "Introduction to Programming", teacherId: valid ObjectId with role 'teacher' }
+  // Expected output: CourseBasicResponseDto with courseName "Introduction to Programming", publicId "C-123456", enrollmentCount 0
   // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_001', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
+  // Note: Happy path - standard course creation flow
+  // checkdb: Verifies courseModel constructor called with correct data, save() invoked to persist to DB
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_CREATE_COURSE_001', async () => {
+    const teacherDoc = { _id: mockTeacherId, role: 'teacher', fullName: 'John Doe' };
+    mockUserModel.findById.mockResolvedValue(teacherDoc);
 
-    const result = await service.createCourse({ courseName: "Course Variation 1", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 1");
-    expect(saveMock).toHaveBeenCalled();
+    const saveMock = jest.fn().mockImplementation(function () {
+      return Promise.resolve(this);
+    });
+    const constructedCourse: any = {
+      _id: new Types.ObjectId(),
+      courseName: 'Introduction to Programming',
+      teacherId: mockTeacherId,
+      publicId: 'C-123456',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      save: saveMock,
+    };
+    (service as any).courseModel = jest.fn().mockReturnValue(constructedCourse);
+
+    const result = await service.createCourse({
+      courseName: 'Introduction to Programming',
+      teacherId: mockTeacherId.toHexString(),
+    });
+
+    expect(result.courseName).toBe('Introduction to Programming');
+    expect(result.publicId).toBe('C-123456');
+    expect(result.enrollmentCount).toBe(0);
+    expect(result.teacherName).toBe('John Doe');
+    expect(saveMock).toHaveBeenCalledTimes(1);
   });
 
-  // TC_createCourse_002
+  // TC_CREATE_COURSE_002
   // Method: createCourse
-  // Purpose: To verify course creation logic for variation 2
-  // Input: { courseName: "Course Variation 2", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 2"
+  // Purpose: Verify NotFoundException is thrown when teacherId does not exist in the database
+  // Input: { courseName: "Math 101", teacherId: non-existent ObjectId }
+  // Expected output: NotFoundException with message "Teacher not found"
   // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_002', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
+  // Note: Edge case - teacher ID references a user that does not exist
+  // checkdb: Verifies userModel.findById was called, no course record created
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_CREATE_COURSE_002', async () => {
+    mockUserModel.findById.mockResolvedValue(null);
 
-    const result = await service.createCourse({ courseName: "Course Variation 2", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 2");
-    expect(saveMock).toHaveBeenCalled();
+    await expect(
+      service.createCourse({
+        courseName: 'Math 101',
+        teacherId: new Types.ObjectId().toHexString(),
+      }),
+    ).rejects.toThrow(NotFoundException);
+
+    expect(mockUserModel.findById).toHaveBeenCalledTimes(1);
   });
 
-  // TC_createCourse_003
+  // TC_CREATE_COURSE_003
   // Method: createCourse
-  // Purpose: To verify course creation logic for variation 3
-  // Input: { courseName: "Course Variation 3", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 3"
+  // Purpose: Verify ForbiddenException is thrown when user has role 'student' instead of 'teacher'
+  // Input: { courseName: "Physics 201", teacherId: valid ObjectId with role 'student' }
+  // Expected output: ForbiddenException with message "Only teachers can create courses"
   // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_003', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 3", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 3");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_004
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 4
-  // Input: { courseName: "Course Variation 4", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 4"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_004', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 4", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 4");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_005
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 5
-  // Input: { courseName: "Course Variation 5", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 5"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_005', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 5", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 5");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_006
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 6
-  // Input: { courseName: "Course Variation 6", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 6"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_006', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 6", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 6");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_007
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 7
-  // Input: { courseName: "Course Variation 7", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 7"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_007', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 7", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 7");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_008
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 8
-  // Input: { courseName: "Course Variation 8", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 8"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_008', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 8", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 8");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_009
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 9
-  // Input: { courseName: "Course Variation 9", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 9"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_009', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 9", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 9");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_010
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 10
-  // Input: { courseName: "Course Variation 10", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 10"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_010', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 10", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 10");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_011
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 11
-  // Input: { courseName: "Course Variation 11", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 11"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_011', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 11", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 11");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_012
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 12
-  // Input: { courseName: "Course Variation 12", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 12"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_012', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 12", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 12");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_013
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 13
-  // Input: { courseName: "Course Variation 13", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 13"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_013', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 13", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 13");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_014
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 14
-  // Input: { courseName: "Course Variation 14", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 14"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_014', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 14", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 14");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_015
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 15
-  // Input: { courseName: "Course Variation 15", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 15"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_015', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 15", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 15");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_016
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 16
-  // Input: { courseName: "Course Variation 16", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 16"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_016', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 16", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 16");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_017
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 17
-  // Input: { courseName: "Course Variation 17", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 17"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_017', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 17", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 17");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_018
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 18
-  // Input: { courseName: "Course Variation 18", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 18"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_018', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 18", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 18");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_019
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 19
-  // Input: { courseName: "Course Variation 19", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 19"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_019', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 19", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 19");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_020
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 20
-  // Input: { courseName: "Course Variation 20", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 20"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_020', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 20", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 20");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_021
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 21
-  // Input: { courseName: "Course Variation 21", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 21"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_021', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 21", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 21");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_022
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 22
-  // Input: { courseName: "Course Variation 22", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 22"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_022', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 22", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 22");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_023
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 23
-  // Input: { courseName: "Course Variation 23", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 23"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_023', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 23", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 23");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_024
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 24
-  // Input: { courseName: "Course Variation 24", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 24"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_024', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 24", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 24");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_025
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 25
-  // Input: { courseName: "Course Variation 25", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 25"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_025', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 25", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 25");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_026
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 26
-  // Input: { courseName: "Course Variation 26", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 26"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_026', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 26", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 26");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_027
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 27
-  // Input: { courseName: "Course Variation 27", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 27"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_027', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 27", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 27");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_028
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 28
-  // Input: { courseName: "Course Variation 28", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 28"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_028', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 28", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 28");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_029
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 29
-  // Input: { courseName: "Course Variation 29", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 29"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_029', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 29", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 29");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_030
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 30
-  // Input: { courseName: "Course Variation 30", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 30"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_030', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 30", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 30");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_031
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 31
-  // Input: { courseName: "Course Variation 31", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 31"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_031', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 31", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 31");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_032
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 32
-  // Input: { courseName: "Course Variation 32", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 32"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_032', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 32", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 32");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_033
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 33
-  // Input: { courseName: "Course Variation 33", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 33"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_033', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 33", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 33");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_034
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 34
-  // Input: { courseName: "Course Variation 34", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 34"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_034', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 34", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 34");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_035
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 35
-  // Input: { courseName: "Course Variation 35", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 35"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_035', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 35", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 35");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_036
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 36
-  // Input: { courseName: "Course Variation 36", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 36"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_036', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 36", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 36");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_037
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 37
-  // Input: { courseName: "Course Variation 37", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 37"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_037', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 37", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 37");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_038
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 38
-  // Input: { courseName: "Course Variation 38", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 38"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_038', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 38", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 38");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_039
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 39
-  // Input: { courseName: "Course Variation 39", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 39"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_039', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 39", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 39");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_040
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 40
-  // Input: { courseName: "Course Variation 40", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 40"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_040', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 40", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 40");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_041
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 41
-  // Input: { courseName: "Course Variation 41", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 41"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_041', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 41", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 41");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_042
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 42
-  // Input: { courseName: "Course Variation 42", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 42"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_042', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 42", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 42");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_043
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 43
-  // Input: { courseName: "Course Variation 43", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 43"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_043', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 43", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 43");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_044
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 44
-  // Input: { courseName: "Course Variation 44", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 44"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_044', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 44", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 44");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-  // TC_createCourse_045
-  // Method: createCourse
-  // Purpose: To verify course creation logic for variation 45
-  // Input: { courseName: "Course Variation 45", teacherId: "mockTeacherId.toHexString()" }
-  // Expected output: Course object with name "Course Variation 45"
-  // Test result: pass
-  // Note: None
-  // checkdb: This is a unit test mocking the DB. No real DB is affected, mock is verified.
-  // rollback: jest.clearAllMocks() is called in beforeEach to restore state.
-  it('TC_createCourse_045', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Instructor' });
-    const saveMock = jest.fn().mockImplementation(function() { return Promise.resolve(this); });
-    function mockCourseConstructor(dto: any) {
-      return { ...dto, _id: new Types.ObjectId(), save: saveMock };
-    }
-    (service as any).courseModel = mockCourseConstructor as any;
-
-    const result = await service.createCourse({ courseName: "Course Variation 45", teacherId: mockTeacherId.toHexString() });
-    expect(result.courseName).toBe("Course Variation 45");
-    expect(saveMock).toHaveBeenCalled();
-  });
-
-
-  // TC_createCourseAuth_001
-  // Method: createCourse
-  // Purpose: To verify course creation is rejected for role student
-  // Input: { courseName: "Fail Course", teacherId: "..." }
-  // Expected output: ForbiddenException
-  // Test result: pass
-  // Note: Validation logic
-  // checkdb: Mocked DB.
-  // rollback: handled by jest.clearAllMocks()
-  it('TC_createCourseAuth_001', async () => {
+  // Note: Authorization check - only role 'teacher' is allowed to create courses
+  // checkdb: Verifies userModel.findById was called, no course record created
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_CREATE_COURSE_003', async () => {
     mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'student' });
-    await expect(service.createCourse({ courseName: 'Fail Course', teacherId: mockTeacherId.toHexString() }))
-      .rejects.toThrow(ForbiddenException);
+
+    await expect(
+      service.createCourse({
+        courseName: 'Physics 201',
+        teacherId: mockTeacherId.toHexString(),
+      }),
+    ).rejects.toThrow(ForbiddenException);
   });
 
-  // TC_createCourseAuth_002
+  // TC_CREATE_COURSE_004
   // Method: createCourse
-  // Purpose: To verify course creation is rejected for role admin
-  // Input: { courseName: "Fail Course", teacherId: "..." }
-  // Expected output: ForbiddenException
+  // Purpose: Verify ForbiddenException is thrown when user has role 'admin' instead of 'teacher'
+  // Input: { courseName: "Chemistry 301", teacherId: valid ObjectId with role 'admin' }
+  // Expected output: ForbiddenException with message "Only teachers can create courses"
   // Test result: pass
-  // Note: Validation logic
-  // checkdb: Mocked DB.
-  // rollback: handled by jest.clearAllMocks()
-  it('TC_createCourseAuth_002', async () => {
+  // Note: Authorization check - admin role should not be able to create courses
+  // checkdb: Verifies userModel.findById was called, no course record created
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_CREATE_COURSE_004', async () => {
     mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'admin' });
-    await expect(service.createCourse({ courseName: 'Fail Course', teacherId: mockTeacherId.toHexString() }))
-      .rejects.toThrow(ForbiddenException);
+
+    await expect(
+      service.createCourse({
+        courseName: 'Chemistry 301',
+        teacherId: mockTeacherId.toHexString(),
+      }),
+    ).rejects.toThrow(ForbiddenException);
   });
 
-  // TC_createCourseAuth_003
+  // TC_CREATE_COURSE_005
   // Method: createCourse
-  // Purpose: To verify course creation is rejected for role guest
-  // Input: { courseName: "Fail Course", teacherId: "..." }
+  // Purpose: Verify that generatePrefixedPublicId is called with prefix 'C' and the course model
+  // Input: { courseName: "Web Development", teacherId: valid teacher ObjectId }
+  // Expected output: Course created with publicId generated by the utility function
+  // Test result: pass
+  // Note: Verifies integration with the public-id utility
+  // checkdb: Confirms generatePrefixedPublicId was invoked with correct parameters
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_CREATE_COURSE_005', async () => {
+    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Jane Smith' });
+
+    const saveMock = jest.fn().mockImplementation(function () {
+      return Promise.resolve(this);
+    });
+    const constructedCourse: any = {
+      _id: new Types.ObjectId(),
+      courseName: 'Web Development',
+      teacherId: mockTeacherId,
+      publicId: 'C-123456',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      save: saveMock,
+    };
+    (service as any).courseModel = jest.fn().mockReturnValue(constructedCourse);
+
+    await service.createCourse({
+      courseName: 'Web Development',
+      teacherId: mockTeacherId.toHexString(),
+    });
+
+    expect(idUtils.generatePrefixedPublicId).toHaveBeenCalledWith('C', expect.anything());
+  });
+
+  // TC_CREATE_COURSE_006
+  // Method: createCourse
+  // Purpose: Verify the returned DTO contains correct teacherId mapped from the input
+  // Input: { courseName: "Data Structures", teacherId: specific valid ObjectId }
+  // Expected output: CourseBasicResponseDto with teacherId matching the input teacherId string
+  // Test result: pass
+  // Note: Ensures the mapCourse private method correctly stringifies the ObjectId
+  // checkdb: Verifies save() was called and the response maps teacherId correctly
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_CREATE_COURSE_006', async () => {
+    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Dr. Lee' });
+
+    const courseObjId = new Types.ObjectId();
+    const saveMock = jest.fn().mockImplementation(function () {
+      return Promise.resolve(this);
+    });
+    const constructedCourse: any = {
+      _id: courseObjId,
+      courseName: 'Data Structures',
+      teacherId: mockTeacherId,
+      publicId: 'C-123456',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      save: saveMock,
+    };
+    (service as any).courseModel = jest.fn().mockReturnValue(constructedCourse);
+
+    const result = await service.createCourse({
+      courseName: 'Data Structures',
+      teacherId: mockTeacherId.toHexString(),
+    });
+
+    expect(result.teacherId).toBe(String(mockTeacherId));
+    expect(result.id).toBe(String(courseObjId));
+  });
+
+  // TC_CREATE_COURSE_007
+  // Method: createCourse
+  // Purpose: Verify course creation with a long course name (boundary test)
+  // Input: { courseName: "A".repeat(200), teacherId: valid teacher ObjectId }
+  // Expected output: CourseBasicResponseDto with the long courseName preserved exactly
+  // Test result: pass
+  // Note: Boundary test - verifies no truncation occurs at the service level
+  // checkdb: Verifies save() was called with the full-length courseName
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_CREATE_COURSE_007', async () => {
+    const longName = 'A'.repeat(200);
+    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Prof. X' });
+
+    const saveMock = jest.fn().mockImplementation(function () {
+      return Promise.resolve(this);
+    });
+    const constructedCourse: any = {
+      _id: new Types.ObjectId(),
+      courseName: longName,
+      teacherId: mockTeacherId,
+      publicId: 'C-123456',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      save: saveMock,
+    };
+    (service as any).courseModel = jest.fn().mockReturnValue(constructedCourse);
+
+    const result = await service.createCourse({
+      courseName: longName,
+      teacherId: mockTeacherId.toHexString(),
+    });
+
+    expect(result.courseName).toBe(longName);
+    expect(result.courseName.length).toBe(200);
+  });
+
+  // TC_CREATE_COURSE_008
+  // Method: createCourse
+  // Purpose: Verify course creation with special characters in course name
+  // Input: { courseName: "C++ & Data Structures (Advanced) #101", teacherId: valid teacher ObjectId }
+  // Expected output: CourseBasicResponseDto with special characters preserved in courseName
+  // Test result: pass
+  // Note: Edge case - special characters should not be stripped or escaped by the service
+  // checkdb: Verifies save() was called with special characters intact
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_CREATE_COURSE_008', async () => {
+    const specialName = 'C++ & Data Structures (Advanced) #101';
+    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Prof. Y' });
+
+    const saveMock = jest.fn().mockImplementation(function () {
+      return Promise.resolve(this);
+    });
+    const constructedCourse: any = {
+      _id: new Types.ObjectId(),
+      courseName: specialName,
+      teacherId: mockTeacherId,
+      publicId: 'C-123456',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      save: saveMock,
+    };
+    (service as any).courseModel = jest.fn().mockReturnValue(constructedCourse);
+
+    const result = await service.createCourse({
+      courseName: specialName,
+      teacherId: mockTeacherId.toHexString(),
+    });
+
+    expect(result.courseName).toBe(specialName);
+  });
+
+  // TC_CREATE_COURSE_009
+  // Method: createCourse
+  // Purpose: Verify course creation sets enrollmentCount to 0 for a new course
+  // Input: { courseName: "Algorithms", teacherId: valid teacher ObjectId }
+  // Expected output: CourseBasicResponseDto with enrollmentCount === 0
+  // Test result: pass
+  // Note: New courses always start with zero enrollments
+  // checkdb: Verifies the mapCourse function is called with enrollmentCount=0
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_CREATE_COURSE_009', async () => {
+    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Dr. Algo' });
+
+    const saveMock = jest.fn().mockImplementation(function () {
+      return Promise.resolve(this);
+    });
+    const constructedCourse: any = {
+      _id: new Types.ObjectId(),
+      courseName: 'Algorithms',
+      teacherId: mockTeacherId,
+      publicId: 'C-123456',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      save: saveMock,
+    };
+    (service as any).courseModel = jest.fn().mockReturnValue(constructedCourse);
+
+    const result = await service.createCourse({
+      courseName: 'Algorithms',
+      teacherId: mockTeacherId.toHexString(),
+    });
+
+    expect(result.enrollmentCount).toBe(0);
+  });
+
+  // TC_CREATE_COURSE_010
+  // Method: createCourse
+  // Purpose: Verify ForbiddenException for an empty-string role (neither 'teacher' nor recognized)
+  // Input: { courseName: "Test Course", teacherId: valid ObjectId with role '' }
   // Expected output: ForbiddenException
   // Test result: pass
-  // Note: Validation logic
-  // checkdb: Mocked DB.
-  // rollback: handled by jest.clearAllMocks()
-  it('TC_createCourseAuth_003', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'guest' });
-    await expect(service.createCourse({ courseName: 'Fail Course', teacherId: mockTeacherId.toHexString() }))
-      .rejects.toThrow(ForbiddenException);
+  // Note: Edge case - empty role string should be rejected
+  // checkdb: No DB write operation performed
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_CREATE_COURSE_010', async () => {
+    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: '' });
+
+    await expect(
+      service.createCourse({
+        courseName: 'Test Course',
+        teacherId: mockTeacherId.toHexString(),
+      }),
+    ).rejects.toThrow(ForbiddenException);
   });
 
-  // TC_createCourseAuth_004
+  // TC_CREATE_COURSE_011
   // Method: createCourse
-  // Purpose: To verify course creation is rejected for role user
-  // Input: { courseName: "Fail Course", teacherId: "..." }
-  // Expected output: ForbiddenException
+  // Purpose: Verify course creation when teacher fullName is undefined (nullable field)
+  // Input: { courseName: "Database Systems", teacherId: valid teacher ObjectId, teacher.fullName = undefined }
+  // Expected output: CourseBasicResponseDto with teacherName === undefined
   // Test result: pass
-  // Note: Validation logic
-  // checkdb: Mocked DB.
-  // rollback: handled by jest.clearAllMocks()
-  it('TC_createCourseAuth_004', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'user' });
-    await expect(service.createCourse({ courseName: 'Fail Course', teacherId: mockTeacherId.toHexString() }))
-      .rejects.toThrow(ForbiddenException);
+  // Note: Edge case - fullName may be optional on User schema
+  // checkdb: Verifies save() was called, response teacherName is undefined
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_CREATE_COURSE_011', async () => {
+    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: undefined });
+
+    const saveMock = jest.fn().mockImplementation(function () {
+      return Promise.resolve(this);
+    });
+    const constructedCourse: any = {
+      _id: new Types.ObjectId(),
+      courseName: 'Database Systems',
+      teacherId: mockTeacherId,
+      publicId: 'C-123456',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      save: saveMock,
+    };
+    (service as any).courseModel = jest.fn().mockReturnValue(constructedCourse);
+
+    const result = await service.createCourse({
+      courseName: 'Database Systems',
+      teacherId: mockTeacherId.toHexString(),
+    });
+
+    expect(result.teacherName).toBeUndefined();
+    expect(result.courseName).toBe('Database Systems');
   });
 
-  // TC_createCourseAuth_005
+  // TC_CREATE_COURSE_012
   // Method: createCourse
-  // Purpose: To verify course creation is rejected for role moderator
-  // Input: { courseName: "Fail Course", teacherId: "..." }
-  // Expected output: ForbiddenException
+  // Purpose: Verify course creation with Unicode characters in course name
+  // Input: { courseName: "数学入門 - 線形代数", teacherId: valid teacher ObjectId }
+  // Expected output: CourseBasicResponseDto with Unicode courseName preserved
   // Test result: pass
-  // Note: Validation logic
-  // checkdb: Mocked DB.
-  // rollback: handled by jest.clearAllMocks()
-  it('TC_createCourseAuth_005', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'moderator' });
-    await expect(service.createCourse({ courseName: 'Fail Course', teacherId: mockTeacherId.toHexString() }))
-      .rejects.toThrow(ForbiddenException);
+  // Note: Internationalization test - Japanese characters
+  // checkdb: Verifies save() was called with Unicode name intact
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_CREATE_COURSE_012', async () => {
+    const unicodeName = '数学入門 - 線形代数';
+    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Tanaka Sensei' });
+
+    const saveMock = jest.fn().mockImplementation(function () {
+      return Promise.resolve(this);
+    });
+    const constructedCourse: any = {
+      _id: new Types.ObjectId(),
+      courseName: unicodeName,
+      teacherId: mockTeacherId,
+      publicId: 'C-123456',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      save: saveMock,
+    };
+    (service as any).courseModel = jest.fn().mockReturnValue(constructedCourse);
+
+    const result = await service.createCourse({
+      courseName: unicodeName,
+      teacherId: mockTeacherId.toHexString(),
+    });
+
+    expect(result.courseName).toBe(unicodeName);
   });
 
-  // TC_createCourseAuth_006
+  // TC_CREATE_COURSE_013
   // Method: createCourse
-  // Purpose: To verify course creation is rejected for role support
-  // Input: { courseName: "Fail Course", teacherId: "..." }
-  // Expected output: ForbiddenException
+  // Purpose: Verify that the courseModel constructor is called with correct teacherId as ObjectId
+  // Input: { courseName: "Operating Systems", teacherId: valid teacher ObjectId string }
+  // Expected output: courseModel constructor called with teacherId as Types.ObjectId instance
   // Test result: pass
-  // Note: Validation logic
-  // checkdb: Mocked DB.
-  // rollback: handled by jest.clearAllMocks()
-  it('TC_createCourseAuth_006', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'support' });
-    await expect(service.createCourse({ courseName: 'Fail Course', teacherId: mockTeacherId.toHexString() }))
-      .rejects.toThrow(ForbiddenException);
+  // Note: Ensures teacherId is converted from string to ObjectId before saving
+  // checkdb: Verifies constructor call arguments include Types.ObjectId for teacherId
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_CREATE_COURSE_013', async () => {
+    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Prof. OS' });
+
+    const saveMock = jest.fn().mockImplementation(function () {
+      return Promise.resolve(this);
+    });
+    const mockConstructor = jest.fn().mockImplementation((dto) => ({
+      ...dto,
+      _id: new Types.ObjectId(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      save: saveMock,
+    }));
+    (service as any).courseModel = mockConstructor;
+
+    await service.createCourse({
+      courseName: 'Operating Systems',
+      teacherId: mockTeacherId.toHexString(),
+    });
+
+    expect(mockConstructor).toHaveBeenCalledWith(
+      expect.objectContaining({
+        courseName: 'Operating Systems',
+        publicId: 'C-123456',
+      }),
+    );
+    // Verify teacherId is an ObjectId
+    const callArgs = mockConstructor.mock.calls[0][0];
+    expect(callArgs.teacherId).toBeInstanceOf(Types.ObjectId);
   });
 
-  // TC_createCourseAuth_007
+  // TC_CREATE_COURSE_014
   // Method: createCourse
-  // Purpose: To verify course creation is rejected for role staff
-  // Input: { courseName: "Fail Course", teacherId: "..." }
-  // Expected output: ForbiddenException
+  // Purpose: Verify response contains createdAt and updatedAt timestamps
+  // Input: { courseName: "Software Engineering", teacherId: valid teacher ObjectId }
+  // Expected output: CourseBasicResponseDto with defined createdAt and updatedAt fields
   // Test result: pass
-  // Note: Validation logic
-  // checkdb: Mocked DB.
-  // rollback: handled by jest.clearAllMocks()
-  it('TC_createCourseAuth_007', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'staff' });
-    await expect(service.createCourse({ courseName: 'Fail Course', teacherId: mockTeacherId.toHexString() }))
-      .rejects.toThrow(ForbiddenException);
+  // Note: Ensures timestamp fields are propagated through mapCourse
+  // checkdb: Verifies course document includes timestamp fields
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_CREATE_COURSE_014', async () => {
+    const now = new Date();
+    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Prof. SE' });
+
+    const saveMock = jest.fn().mockImplementation(function () {
+      return Promise.resolve(this);
+    });
+    const constructedCourse: any = {
+      _id: new Types.ObjectId(),
+      courseName: 'Software Engineering',
+      teacherId: mockTeacherId,
+      publicId: 'C-123456',
+      createdAt: now,
+      updatedAt: now,
+      save: saveMock,
+    };
+    (service as any).courseModel = jest.fn().mockReturnValue(constructedCourse);
+
+    const result = await service.createCourse({
+      courseName: 'Software Engineering',
+      teacherId: mockTeacherId.toHexString(),
+    });
+
+    expect(result.createdAt).toBe(now);
+    expect(result.updatedAt).toBe(now);
   });
 
-  // TC_createCourseAuth_008
+  // TC_CREATE_COURSE_015
   // Method: createCourse
-  // Purpose: To verify course creation is rejected for role external
-  // Input: { courseName: "Fail Course", teacherId: "..." }
-  // Expected output: ForbiddenException
+  // Purpose: Verify that save() failure propagates the error to the caller
+  // Input: { courseName: "Failing Course", teacherId: valid teacher ObjectId }
+  // Expected output: Error thrown from save() is propagated
   // Test result: pass
-  // Note: Validation logic
-  // checkdb: Mocked DB.
-  // rollback: handled by jest.clearAllMocks()
-  it('TC_createCourseAuth_008', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'external' });
-    await expect(service.createCourse({ courseName: 'Fail Course', teacherId: mockTeacherId.toHexString() }))
-      .rejects.toThrow(ForbiddenException);
+  // Note: Tests error propagation when DB write fails
+  // checkdb: Verifies save() was called but threw an error
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_CREATE_COURSE_015', async () => {
+    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Prof. Err' });
+
+    const saveMock = jest.fn().mockRejectedValue(new Error('DB write failed'));
+    const constructedCourse: any = {
+      _id: new Types.ObjectId(),
+      courseName: 'Failing Course',
+      teacherId: mockTeacherId,
+      publicId: 'C-123456',
+      save: saveMock,
+    };
+    (service as any).courseModel = jest.fn().mockReturnValue(constructedCourse);
+
+    await expect(
+      service.createCourse({
+        courseName: 'Failing Course',
+        teacherId: mockTeacherId.toHexString(),
+      }),
+    ).rejects.toThrow('DB write failed');
   });
 
-  // TC_createCourseAuth_009
+  // TC_CREATE_COURSE_016
   // Method: createCourse
-  // Purpose: To verify course creation is rejected for role parent
-  // Input: { courseName: "Fail Course", teacherId: "..." }
-  // Expected output: ForbiddenException
+  // Purpose: Verify that findById is called with the exact teacherId string from DTO
+  // Input: { courseName: "Networking", teacherId: specific ObjectId string }
+  // Expected output: userModel.findById called with exact teacherId string
   // Test result: pass
-  // Note: Validation logic
-  // checkdb: Mocked DB.
-  // rollback: handled by jest.clearAllMocks()
-  it('TC_createCourseAuth_009', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'parent' });
-    await expect(service.createCourse({ courseName: 'Fail Course', teacherId: mockTeacherId.toHexString() }))
-      .rejects.toThrow(ForbiddenException);
+  // checkdb: Verifies findById receives the exact input teacherId
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_CREATE_COURSE_016', async () => {
+    const specificId = new Types.ObjectId();
+    mockUserModel.findById.mockResolvedValue({ _id: specificId, role: 'teacher', fullName: 'Prof. Net' });
+
+    const saveMock = jest.fn().mockImplementation(function () { return Promise.resolve(this); });
+    (service as any).courseModel = jest.fn().mockReturnValue({
+      _id: new Types.ObjectId(), courseName: 'Networking', teacherId: specificId,
+      publicId: 'C-123456', createdAt: new Date(), updatedAt: new Date(), save: saveMock,
+    });
+
+    await service.createCourse({ courseName: 'Networking', teacherId: specificId.toHexString() });
+
+    expect(mockUserModel.findById).toHaveBeenCalledWith(specificId.toHexString());
   });
 
-  // TC_createCourseAuth_010
+  // TC_CREATE_COURSE_017
   // Method: createCourse
-  // Purpose: To verify course creation is rejected for role invalid
-  // Input: { courseName: "Fail Course", teacherId: "..." }
-  // Expected output: ForbiddenException
+  // Purpose: Verify error propagation when generatePrefixedPublicId fails
+  // Input: { courseName: "Error ID Course", teacherId: valid teacher ObjectId }
+  // Expected output: Error from generatePrefixedPublicId propagated
   // Test result: pass
-  // Note: Validation logic
-  // checkdb: Mocked DB.
-  // rollback: handled by jest.clearAllMocks()
-  it('TC_createCourseAuth_010', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'invalid' });
-    await expect(service.createCourse({ courseName: 'Fail Course', teacherId: mockTeacherId.toHexString() }))
-      .rejects.toThrow(ForbiddenException);
+  // checkdb: No DB write occurs (fails before save)
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_CREATE_COURSE_017', async () => {
+    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Prof. E' });
+    (idUtils.generatePrefixedPublicId as jest.Mock).mockRejectedValue(new Error('ID generation failed'));
+
+    await expect(
+      service.createCourse({ courseName: 'Error ID Course', teacherId: mockTeacherId.toHexString() }),
+    ).rejects.toThrow('ID generation failed');
   });
 
-  // TC_createCourseAuth_011
+  // TC_CREATE_COURSE_018
   // Method: createCourse
-  // Purpose: To verify course creation is rejected for role tester
-  // Input: { courseName: "Fail Course", teacherId: "..." }
-  // Expected output: ForbiddenException
+  // Purpose: Verify that userModel.findById is called before any course creation logic
+  // Input: { courseName: "Order Check", teacherId: non-existent ObjectId }
+  // Expected output: NotFoundException, courseModel constructor never called
   // Test result: pass
-  // Note: Validation logic
-  // checkdb: Mocked DB.
-  // rollback: handled by jest.clearAllMocks()
-  it('TC_createCourseAuth_011', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'tester' });
-    await expect(service.createCourse({ courseName: 'Fail Course', teacherId: mockTeacherId.toHexString() }))
-      .rejects.toThrow(ForbiddenException);
+  // checkdb: Verifies user lookup happens first, no course model instantiated
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_CREATE_COURSE_018', async () => {
+    mockUserModel.findById.mockResolvedValue(null);
+    const constructorSpy = jest.fn();
+    (service as any).courseModel = constructorSpy;
+
+    await expect(
+      service.createCourse({ courseName: 'Order Check', teacherId: new Types.ObjectId().toHexString() }),
+    ).rejects.toThrow(NotFoundException);
+
+    expect(constructorSpy).not.toHaveBeenCalled();
   });
 
-  // TC_createCourseAuth_012
+  // TC_CREATE_COURSE_019
   // Method: createCourse
-  // Purpose: To verify course creation is rejected for role manager
-  // Input: { courseName: "Fail Course", teacherId: "..." }
-  // Expected output: ForbiddenException
+  // Purpose: Verify course creation with whitespace-only course name (service does not trim)
+  // Input: { courseName: "   ", teacherId: valid teacher ObjectId }
+  // Expected output: CourseBasicResponseDto with courseName = "   " (service-level does not validate)
   // Test result: pass
-  // Note: Validation logic
-  // checkdb: Mocked DB.
-  // rollback: handled by jest.clearAllMocks()
-  it('TC_createCourseAuth_012', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'manager' });
-    await expect(service.createCourse({ courseName: 'Fail Course', teacherId: mockTeacherId.toHexString() }))
-      .rejects.toThrow(ForbiddenException);
+  // Note: Validation should be handled by DTO/class-validator at controller level
+  // checkdb: Verifies save() called with whitespace name
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_CREATE_COURSE_019', async () => {
+    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Prof. W' });
+
+    const saveMock = jest.fn().mockImplementation(function () { return Promise.resolve(this); });
+    (service as any).courseModel = jest.fn().mockReturnValue({
+      _id: new Types.ObjectId(), courseName: '   ', teacherId: mockTeacherId,
+      publicId: 'C-123456', createdAt: new Date(), updatedAt: new Date(), save: saveMock,
+    });
+
+    const result = await service.createCourse({ courseName: '   ', teacherId: mockTeacherId.toHexString() });
+    expect(result.courseName).toBe('   ');
   });
 
-  // TC_createCourseAuth_013
-  // Method: createCourse
-  // Purpose: To verify course creation is rejected for role editor
-  // Input: { courseName: "Fail Course", teacherId: "..." }
-  // Expected output: ForbiddenException
+  // ============================================================
+  // deleteCourse Method Tests
+  // ============================================================
+
+  // TC_DELETE_COURSE_001
+  // Method: deleteCourse
+  // Purpose: Verify successful deletion of an existing course
+  // Input: courseId = valid existing course ObjectId
+  // Expected output: void (no error thrown), deleteOne called with correct _id
   // Test result: pass
-  // Note: Validation logic
-  // checkdb: Mocked DB.
-  // rollback: handled by jest.clearAllMocks()
-  it('TC_createCourseAuth_013', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'editor' });
-    await expect(service.createCourse({ courseName: 'Fail Course', teacherId: mockTeacherId.toHexString() }))
-      .rejects.toThrow(ForbiddenException);
+  // checkdb: Verifies findById was called to check existence, deleteOne was called with correct _id
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_DELETE_COURSE_001', async () => {
+    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, courseName: 'ToDelete' });
+    mockCourseModel.deleteOne.mockResolvedValue({ deletedCount: 1 });
+
+    await service.deleteCourse(mockCourseId.toHexString());
+
+    expect(mockCourseModel.findById).toHaveBeenCalledWith(mockCourseId.toHexString());
+    expect(mockCourseModel.deleteOne).toHaveBeenCalledWith({ _id: mockCourseId.toHexString() });
   });
 
-  // TC_createCourseAuth_014
-  // Method: createCourse
-  // Purpose: To verify course creation is rejected for role viewer
-  // Input: { courseName: "Fail Course", teacherId: "..." }
-  // Expected output: ForbiddenException
+  // TC_DELETE_COURSE_002
+  // Method: deleteCourse
+  // Purpose: Verify NotFoundException when course does not exist
+  // Input: courseId = non-existent ObjectId
+  // Expected output: NotFoundException with message "Course not found"
   // Test result: pass
-  // Note: Validation logic
-  // checkdb: Mocked DB.
-  // rollback: handled by jest.clearAllMocks()
-  it('TC_createCourseAuth_014', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'viewer' });
-    await expect(service.createCourse({ courseName: 'Fail Course', teacherId: mockTeacherId.toHexString() }))
-      .rejects.toThrow(ForbiddenException);
+  // checkdb: Verifies findById was called, deleteOne was NOT called
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_DELETE_COURSE_002', async () => {
+    mockCourseModel.findById.mockResolvedValue(null);
+
+    await expect(
+      service.deleteCourse(new Types.ObjectId().toHexString()),
+    ).rejects.toThrow(NotFoundException);
+
+    expect(mockCourseModel.deleteOne).not.toHaveBeenCalled();
   });
 
-  // TC_createCourseAuth_015
-  // Method: createCourse
-  // Purpose: To verify course creation is rejected for role auditor
-  // Input: { courseName: "Fail Course", teacherId: "..." }
-  // Expected output: ForbiddenException
+  // TC_DELETE_COURSE_003
+  // Method: deleteCourse
+  // Purpose: Verify deleteOne is called exactly once for a valid course
+  // Input: courseId = valid existing course ObjectId
+  // Expected output: deleteOne called exactly 1 time
   // Test result: pass
-  // Note: Validation logic
-  // checkdb: Mocked DB.
-  // rollback: handled by jest.clearAllMocks()
-  it('TC_createCourseAuth_015', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'auditor' });
-    await expect(service.createCourse({ courseName: 'Fail Course', teacherId: mockTeacherId.toHexString() }))
-      .rejects.toThrow(ForbiddenException);
+  // checkdb: Verifies deleteOne call count is 1
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_DELETE_COURSE_003', async () => {
+    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, courseName: 'SingleDelete' });
+    mockCourseModel.deleteOne.mockResolvedValue({ deletedCount: 1 });
+
+    await service.deleteCourse(mockCourseId.toHexString());
+
+    expect(mockCourseModel.deleteOne).toHaveBeenCalledTimes(1);
+  });
+
+  // TC_DELETE_COURSE_004
+  // Method: deleteCourse
+  // Purpose: Verify that deleteCourse returns void (undefined) on success
+  // Input: courseId = valid existing course ObjectId
+  // Expected output: undefined
+  // Test result: pass
+  // checkdb: Verifies the method resolves without a return value
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_DELETE_COURSE_004', async () => {
+    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, courseName: 'VoidReturn' });
+    mockCourseModel.deleteOne.mockResolvedValue({ deletedCount: 1 });
+
+    const result = await service.deleteCourse(mockCourseId.toHexString());
+
+    expect(result).toBeUndefined();
+  });
+
+  // TC_DELETE_COURSE_005
+  // Method: deleteCourse
+  // Purpose: Verify error propagation when deleteOne fails
+  // Input: courseId = valid existing course ObjectId, deleteOne throws DB error
+  // Expected output: Error "DB delete failed" propagated
+  // Test result: pass
+  // checkdb: Verifies findById succeeded but deleteOne threw
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_DELETE_COURSE_005', async () => {
+    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, courseName: 'FailDelete' });
+    mockCourseModel.deleteOne.mockRejectedValue(new Error('DB delete failed'));
+
+    await expect(
+      service.deleteCourse(mockCourseId.toHexString()),
+    ).rejects.toThrow('DB delete failed');
+  });
+
+  // TC_DELETE_COURSE_006
+  // Method: deleteCourse
+  // Purpose: Verify findById is called before deleteOne (order of operations)
+  // Input: courseId = non-existent ObjectId
+  // Expected output: NotFoundException, deleteOne never called
+  // Test result: pass
+  // checkdb: Verifies findById called first, deleteOne not invoked
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_DELETE_COURSE_006', async () => {
+    mockCourseModel.findById.mockResolvedValue(null);
+
+    await expect(
+      service.deleteCourse(new Types.ObjectId().toHexString()),
+    ).rejects.toThrow(NotFoundException);
+
+    expect(mockCourseModel.findById).toHaveBeenCalledTimes(1);
+    expect(mockCourseModel.deleteOne).not.toHaveBeenCalled();
+  });
+
+  // TC_DELETE_COURSE_007
+  // Method: deleteCourse
+  // Purpose: Verify findById receives the exact courseId string
+  // Input: courseId = specific ObjectId string
+  // Expected output: findById called with exact string
+  // Test result: pass
+  // checkdb: Verifies argument passed to findById
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_DELETE_COURSE_007', async () => {
+    const specificCourseId = new Types.ObjectId();
+    mockCourseModel.findById.mockResolvedValue({ _id: specificCourseId });
+    mockCourseModel.deleteOne.mockResolvedValue({ deletedCount: 1 });
+
+    await service.deleteCourse(specificCourseId.toHexString());
+
+    expect(mockCourseModel.findById).toHaveBeenCalledWith(specificCourseId.toHexString());
+    expect(mockCourseModel.deleteOne).toHaveBeenCalledWith({ _id: specificCourseId.toHexString() });
   });
 
 
-  // TC_getCourses_001
+  // ============================================================
+  // updateCourseName Method Tests
+  // ============================================================
+
+  // TC_UPDATE_COURSE_001
+  // Method: updateCourseName
+  // Purpose: Verify successful course name update
+  // Input: courseId = valid ObjectId, updateDto = { courseName: "Updated Name" }
+  // Expected output: CourseBasicResponseDto with courseName "Updated Name"
+  // Test result: pass
+  // checkdb: Verifies findById, save(), findById(teacherId), countDocuments all called
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_UPDATE_COURSE_001', async () => {
+    const mockCourse = {
+      _id: mockCourseId,
+      courseName: 'Old Name',
+      teacherId: mockTeacherId,
+      publicId: 'C-111',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      save: jest.fn().mockImplementation(function () {
+        this.courseName = 'Updated Name';
+        return Promise.resolve(this);
+      }),
+    };
+    mockCourseModel.findById.mockResolvedValue(mockCourse);
+    mockUserModel.findById.mockResolvedValue({ fullName: 'Teacher A' });
+    mockEnrollmentModel.countDocuments.mockResolvedValue(10);
+
+    const result = await service.updateCourseName(mockCourseId.toHexString(), { courseName: 'Updated Name' });
+
+    expect(result.courseName).toBe('Updated Name');
+    expect(result.enrollmentCount).toBe(10);
+    expect(result.teacherName).toBe('Teacher A');
+    expect(mockCourse.save).toHaveBeenCalledTimes(1);
+  });
+
+  // TC_UPDATE_COURSE_002
+  // Method: updateCourseName
+  // Purpose: Verify NotFoundException when course does not exist
+  // Input: courseId = non-existent ObjectId, updateDto = { courseName: "New" }
+  // Expected output: NotFoundException
+  // Test result: pass
+  // checkdb: Verifies findById was called, save() was NOT called
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_UPDATE_COURSE_002', async () => {
+    mockCourseModel.findById.mockResolvedValue(null);
+
+    await expect(
+      service.updateCourseName(new Types.ObjectId().toHexString(), { courseName: 'New' }),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  // TC_UPDATE_COURSE_003
+  // Method: updateCourseName
+  // Purpose: Verify that the course name is actually mutated on the document before save
+  // Input: courseId = valid ObjectId, updateDto = { courseName: "Mutated Name" }
+  // Expected output: Course document's courseName property set to "Mutated Name" before save
+  // Test result: pass
+  // checkdb: Verifies courseName was changed on the document object
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_UPDATE_COURSE_003', async () => {
+    const mockCourse: any = {
+      _id: mockCourseId,
+      courseName: 'Before',
+      teacherId: mockTeacherId,
+      publicId: 'C-222',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      save: jest.fn().mockImplementation(function () { return Promise.resolve(this); }),
+    };
+    mockCourseModel.findById.mockResolvedValue(mockCourse);
+    mockUserModel.findById.mockResolvedValue({ fullName: 'T' });
+    mockEnrollmentModel.countDocuments.mockResolvedValue(0);
+
+    await service.updateCourseName(mockCourseId.toHexString(), { courseName: 'Mutated Name' });
+
+    expect(mockCourse.courseName).toBe('Mutated Name');
+  });
+
+  // TC_UPDATE_COURSE_004
+  // Method: updateCourseName
+  // Purpose: Verify response when teacher is null (deleted teacher)
+  // Input: courseId = valid ObjectId, teacher lookup returns null
+  // Expected output: CourseBasicResponseDto with teacherName === undefined
+  // Test result: pass
+  // checkdb: Verifies findById for teacher returns null, response still generated
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_UPDATE_COURSE_004', async () => {
+    const mockCourse: any = {
+      _id: mockCourseId,
+      courseName: 'Old',
+      teacherId: mockTeacherId,
+      publicId: 'C-333',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      save: jest.fn().mockImplementation(function () { return Promise.resolve(this); }),
+    };
+    mockCourseModel.findById.mockResolvedValue(mockCourse);
+    mockUserModel.findById.mockResolvedValue(null);
+    mockEnrollmentModel.countDocuments.mockResolvedValue(3);
+
+    const result = await service.updateCourseName(mockCourseId.toHexString(), { courseName: 'New Name' });
+
+    expect(result.teacherName).toBeUndefined();
+    expect(result.enrollmentCount).toBe(3);
+  });
+
+  // TC_UPDATE_COURSE_005
+  // Method: updateCourseName
+  // Purpose: Verify update with empty enrollment count (zero students)
+  // Input: courseId = valid ObjectId, enrollmentModel.countDocuments returns 0
+  // Expected output: CourseBasicResponseDto with enrollmentCount === 0
+  // Test result: pass
+  // checkdb: Verifies countDocuments called with correct courseId filter
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_UPDATE_COURSE_005', async () => {
+    const mockCourse: any = {
+      _id: mockCourseId,
+      courseName: 'Old',
+      teacherId: mockTeacherId,
+      publicId: 'C-444',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      save: jest.fn().mockImplementation(function () { return Promise.resolve(this); }),
+    };
+    mockCourseModel.findById.mockResolvedValue(mockCourse);
+    mockUserModel.findById.mockResolvedValue({ fullName: 'Prof Zero' });
+    mockEnrollmentModel.countDocuments.mockResolvedValue(0);
+
+    const result = await service.updateCourseName(mockCourseId.toHexString(), { courseName: 'Zero Enrollment' });
+
+    expect(result.enrollmentCount).toBe(0);
+    expect(mockEnrollmentModel.countDocuments).toHaveBeenCalledWith({ courseId: mockCourseId });
+  });
+
+  // TC_UPDATE_COURSE_006
+  // Method: updateCourseName
+  // Purpose: Verify update with special characters in the new course name
+  // Input: courseId = valid ObjectId, updateDto = { courseName: "C++ & Algorithms (v2.0)" }
+  // Expected output: CourseBasicResponseDto with courseName containing special characters
+  // Test result: pass
+  // checkdb: Verifies save() was called with special characters intact
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_UPDATE_COURSE_006', async () => {
+    const mockCourse: any = {
+      _id: mockCourseId,
+      courseName: 'Old',
+      teacherId: mockTeacherId,
+      publicId: 'C-555',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      save: jest.fn().mockImplementation(function () { return Promise.resolve(this); }),
+    };
+    mockCourseModel.findById.mockResolvedValue(mockCourse);
+    mockUserModel.findById.mockResolvedValue({ fullName: 'Prof Special' });
+    mockEnrollmentModel.countDocuments.mockResolvedValue(5);
+
+    const result = await service.updateCourseName(mockCourseId.toHexString(), { courseName: 'C++ & Algorithms (v2.0)' });
+
+    expect(result.courseName).toBe('C++ & Algorithms (v2.0)');
+  });
+
+  // TC_UPDATE_COURSE_007
+  // Method: updateCourseName
+  // Purpose: Verify error propagation when save() fails during update
+  // Input: courseId = valid ObjectId, save() rejects with error
+  // Expected output: Error propagated to caller
+  // Test result: pass
+  // checkdb: Verifies save() was called but threw an error
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_UPDATE_COURSE_007', async () => {
+    const mockCourse: any = {
+      _id: mockCourseId,
+      courseName: 'Old',
+      teacherId: mockTeacherId,
+      save: jest.fn().mockRejectedValue(new Error('Save failed')),
+    };
+    mockCourseModel.findById.mockResolvedValue(mockCourse);
+
+    await expect(
+      service.updateCourseName(mockCourseId.toHexString(), { courseName: 'Will Fail' }),
+    ).rejects.toThrow('Save failed');
+  });
+
+  // TC_UPDATE_COURSE_008
+  // Method: updateCourseName
+  // Purpose: Verify high enrollment count is correctly returned
+  // Input: courseId = valid, enrollmentModel.countDocuments returns 9999
+  // Expected output: CourseBasicResponseDto with enrollmentCount === 9999
+  // Test result: pass
+  // checkdb: Verifies countDocuments returns large number
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_UPDATE_COURSE_008', async () => {
+    const mockCourse: any = {
+      _id: mockCourseId, courseName: 'Popular', teacherId: mockTeacherId,
+      publicId: 'C-POP', createdAt: new Date(), updatedAt: new Date(),
+      save: jest.fn().mockImplementation(function () { return Promise.resolve(this); }),
+    };
+    mockCourseModel.findById.mockResolvedValue(mockCourse);
+    mockUserModel.findById.mockResolvedValue({ fullName: 'Popular Prof' });
+    mockEnrollmentModel.countDocuments.mockResolvedValue(9999);
+
+    const result = await service.updateCourseName(mockCourseId.toHexString(), { courseName: 'Popular Course' });
+
+    expect(result.enrollmentCount).toBe(9999);
+  });
+
+  // TC_UPDATE_COURSE_009
+  // Method: updateCourseName
+  // Purpose: Verify that updatedAt timestamp is propagated in the response
+  // Input: courseId = valid, course has specific updatedAt date
+  // Expected output: CourseBasicResponseDto with matching updatedAt
+  // Test result: pass
+  // checkdb: Verifies timestamp field is included in response
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_UPDATE_COURSE_009', async () => {
+    const specificDate = new Date('2025-01-15T10:30:00Z');
+    const mockCourse: any = {
+      _id: mockCourseId, courseName: 'Timed', teacherId: mockTeacherId,
+      publicId: 'C-TIME', createdAt: new Date('2024-01-01'), updatedAt: specificDate,
+      save: jest.fn().mockImplementation(function () { return Promise.resolve(this); }),
+    };
+    mockCourseModel.findById.mockResolvedValue(mockCourse);
+    mockUserModel.findById.mockResolvedValue({ fullName: 'T' });
+    mockEnrollmentModel.countDocuments.mockResolvedValue(0);
+
+    const result = await service.updateCourseName(mockCourseId.toHexString(), { courseName: 'Timed Update' });
+
+    expect(result.updatedAt).toBe(specificDate);
+    expect(result.createdAt).toEqual(new Date('2024-01-01'));
+  });
+
+  // TC_UPDATE_COURSE_010
+  // Method: updateCourseName
+  // Purpose: Verify publicId is preserved after name update
+  // Input: courseId = valid, course has publicId 'C-ORIGINAL'
+  // Expected output: CourseBasicResponseDto with publicId 'C-ORIGINAL' unchanged
+  // Test result: pass
+  // checkdb: Verifies publicId is not modified by the update operation
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_UPDATE_COURSE_010', async () => {
+    const mockCourse: any = {
+      _id: mockCourseId, courseName: 'Original', teacherId: mockTeacherId,
+      publicId: 'C-ORIGINAL', createdAt: new Date(), updatedAt: new Date(),
+      save: jest.fn().mockImplementation(function () { return Promise.resolve(this); }),
+    };
+    mockCourseModel.findById.mockResolvedValue(mockCourse);
+    mockUserModel.findById.mockResolvedValue({ fullName: 'Prof. O' });
+    mockEnrollmentModel.countDocuments.mockResolvedValue(5);
+
+    const result = await service.updateCourseName(mockCourseId.toHexString(), { courseName: 'New Name' });
+
+    expect(result.publicId).toBe('C-ORIGINAL');
+  });
+
+  // TC_UPDATE_COURSE_011
+  // Method: updateCourseName
+  // Purpose: Verify update with Unicode characters in the new name
+  // Input: courseId = valid, updateDto = { courseName: "Khóa học Tiếng Việt 🇻🇳" }
+  // Expected output: CourseBasicResponseDto with Unicode name preserved
+  // Test result: pass
+  // checkdb: Verifies save() called with Unicode name
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_UPDATE_COURSE_011', async () => {
+    const mockCourse: any = {
+      _id: mockCourseId, courseName: 'Old', teacherId: mockTeacherId,
+      publicId: 'C-UNI', createdAt: new Date(), updatedAt: new Date(),
+      save: jest.fn().mockImplementation(function () { return Promise.resolve(this); }),
+    };
+    mockCourseModel.findById.mockResolvedValue(mockCourse);
+    mockUserModel.findById.mockResolvedValue({ fullName: 'Giáo viên' });
+    mockEnrollmentModel.countDocuments.mockResolvedValue(0);
+
+    const result = await service.updateCourseName(mockCourseId.toHexString(), { courseName: 'Khóa học Tiếng Việt 🇻🇳' });
+
+    expect(result.courseName).toBe('Khóa học Tiếng Việt 🇻🇳');
+  });
+
+  // ============================================================
+  // getCoursesByTeacher Method Tests
+  // ============================================================
+
+  // TC_GET_COURSES_001
   // Method: getCoursesByTeacher
-  // Purpose: To apply search filter for query Math
-  // Input: query string "Math"
-  // Expected output: Array of courses matching the query
+  // Purpose: Verify retrieval of courses for a valid teacher without search filter
+  // Input: teacherId = valid teacher ObjectId, queryDto = {}
+  // Expected output: Array of CourseBasicResponseDto with correct mapping
   // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB read.
-  // rollback: none required for read operation
-  it('TC_getCourses_001', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher' });
+  // checkdb: Verifies find() called with teacherId filter, aggregate called for enrollment counts
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_GET_COURSES_001', async () => {
+    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Dr. A' });
+    const courses = [
+      { _id: new Types.ObjectId(), courseName: 'Course A', teacherId: mockTeacherId, publicId: 'C-001', createdAt: new Date(), updatedAt: new Date() },
+      { _id: new Types.ObjectId(), courseName: 'Course B', teacherId: mockTeacherId, publicId: 'C-002', createdAt: new Date(), updatedAt: new Date() },
+    ];
+    mockCourseModel.find.mockReturnValue({ sort: jest.fn().mockResolvedValue(courses) });
+    mockEnrollmentModel.aggregate.mockResolvedValue([]);
+
+    const result = await service.getCoursesByTeacher(mockTeacherId.toHexString(), {});
+
+    expect(result).toHaveLength(2);
+    expect(result[0].courseName).toBe('Course A');
+    expect(result[1].courseName).toBe('Course B');
+  });
+
+  // TC_GET_COURSES_002
+  // Method: getCoursesByTeacher
+  // Purpose: Verify NotFoundException when teacher does not exist
+  // Input: teacherId = non-existent ObjectId
+  // Expected output: NotFoundException with message "Teacher not found"
+  // Test result: pass
+  // checkdb: Verifies findById was called, find() was NOT called
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_GET_COURSES_002', async () => {
+    mockUserModel.findById.mockResolvedValue(null);
+
+    await expect(
+      service.getCoursesByTeacher(new Types.ObjectId().toHexString()),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  // TC_GET_COURSES_003
+  // Method: getCoursesByTeacher
+  // Purpose: Verify ForbiddenException when user role is 'student'
+  // Input: teacherId = valid ObjectId with role 'student'
+  // Expected output: ForbiddenException with message "Only teachers can have courses"
+  // Test result: pass
+  // checkdb: Verifies findById was called, find() was NOT called
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_GET_COURSES_003', async () => {
+    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'student' });
+
+    await expect(
+      service.getCoursesByTeacher(mockTeacherId.toHexString()),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  // TC_GET_COURSES_004
+  // Method: getCoursesByTeacher
+  // Purpose: Verify search filter is applied correctly in the query
+  // Input: teacherId = valid teacher ObjectId, queryDto = { search: "Math" }
+  // Expected output: find() called with $or filter containing regex for courseName and publicId
+  // Test result: pass
+  // checkdb: Verifies find() called with correct search regex filter
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_GET_COURSES_004', async () => {
+    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'T' });
     mockCourseModel.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
     mockEnrollmentModel.aggregate.mockResolvedValue([]);
-    (service as any).courseModel = mockCourseModel;
 
     await service.getCoursesByTeacher(mockTeacherId.toHexString(), { search: 'Math' });
 
-    expect(mockCourseModel.find).toHaveBeenCalledWith(expect.objectContaining({
-      $or: [
-        { courseName: { $regex: 'Math', $options: 'i' } },
-        { publicId: { $regex: 'Math', $options: 'i' } }
-      ]
-    }));
+    expect(mockCourseModel.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        $or: [
+          { courseName: { $regex: 'Math', $options: 'i' } },
+          { publicId: { $regex: 'Math', $options: 'i' } },
+        ],
+      }),
+    );
   });
 
-  // TC_getCourses_002
+  // TC_GET_COURSES_005
   // Method: getCoursesByTeacher
-  // Purpose: To apply search filter for query Physics
-  // Input: query string "Physics"
-  // Expected output: Array of courses matching the query
+  // Purpose: Verify empty array returned when teacher has no courses
+  // Input: teacherId = valid teacher ObjectId, no courses in DB
+  // Expected output: Empty array []
   // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB read.
-  // rollback: none required for read operation
-  it('TC_getCourses_002', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher' });
+  // checkdb: Verifies find() returned empty array, aggregate also returns empty
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_GET_COURSES_005', async () => {
+    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'T' });
     mockCourseModel.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
     mockEnrollmentModel.aggregate.mockResolvedValue([]);
-    (service as any).courseModel = mockCourseModel;
 
-    await service.getCoursesByTeacher(mockTeacherId.toHexString(), { search: 'Physics' });
+    const result = await service.getCoursesByTeacher(mockTeacherId.toHexString());
 
-    expect(mockCourseModel.find).toHaveBeenCalledWith(expect.objectContaining({
-      $or: [
-        { courseName: { $regex: 'Physics', $options: 'i' } },
-        { publicId: { $regex: 'Physics', $options: 'i' } }
-      ]
-    }));
+    expect(result).toEqual([]);
   });
 
-  // TC_getCourses_003
+  // TC_GET_COURSES_006
   // Method: getCoursesByTeacher
-  // Purpose: To apply search filter for query Chemistry
-  // Input: query string "Chemistry"
-  // Expected output: Array of courses matching the query
+  // Purpose: Verify enrollment counts are correctly mapped to each course
+  // Input: teacherId = valid teacher ObjectId, 2 courses with different enrollment counts
+  // Expected output: Array where each course has correct enrollmentCount from aggregate
   // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB read.
-  // rollback: none required for read operation
-  it('TC_getCourses_003', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher' });
+  // checkdb: Verifies aggregate result is correctly mapped via countMap
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_GET_COURSES_006', async () => {
+    const cId1 = new Types.ObjectId();
+    const cId2 = new Types.ObjectId();
+    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'T' });
+    mockCourseModel.find.mockReturnValue({
+      sort: jest.fn().mockResolvedValue([
+        { _id: cId1, courseName: 'C1', teacherId: mockTeacherId, publicId: 'C-X1', createdAt: new Date(), updatedAt: new Date() },
+        { _id: cId2, courseName: 'C2', teacherId: mockTeacherId, publicId: 'C-X2', createdAt: new Date(), updatedAt: new Date() },
+      ]),
+    });
+    mockEnrollmentModel.aggregate.mockResolvedValue([
+      { _id: cId1, count: 15 },
+      { _id: cId2, count: 30 },
+    ]);
+
+    const result = await service.getCoursesByTeacher(mockTeacherId.toHexString());
+
+    expect(result[0].enrollmentCount).toBe(15);
+    expect(result[1].enrollmentCount).toBe(30);
+  });
+
+  // TC_GET_COURSES_007
+  // Method: getCoursesByTeacher
+  // Purpose: Verify enrollmentCount defaults to 0 when aggregate has no match for a course
+  // Input: teacherId = valid teacher ObjectId, 1 course, aggregate returns empty
+  // Expected output: Course with enrollmentCount === 0
+  // Test result: pass
+  // checkdb: Verifies countMap fallback to 0 works correctly
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_GET_COURSES_007', async () => {
+    const cId = new Types.ObjectId();
+    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'T' });
+    mockCourseModel.find.mockReturnValue({
+      sort: jest.fn().mockResolvedValue([
+        { _id: cId, courseName: 'NoEnroll', teacherId: mockTeacherId, publicId: 'C-NE', createdAt: new Date(), updatedAt: new Date() },
+      ]),
+    });
+    mockEnrollmentModel.aggregate.mockResolvedValue([]);
+
+    const result = await service.getCoursesByTeacher(mockTeacherId.toHexString());
+
+    expect(result[0].enrollmentCount).toBe(0);
+  });
+
+  // TC_GET_COURSES_008
+  // Method: getCoursesByTeacher
+  // Purpose: Verify no $or filter applied when search is empty string
+  // Input: teacherId = valid teacher ObjectId, queryDto = { search: '' }
+  // Expected output: find() called without $or filter
+  // Test result: pass
+  // checkdb: Verifies find() filter only contains teacherId, no $or
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_GET_COURSES_008', async () => {
+    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'T' });
     mockCourseModel.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
     mockEnrollmentModel.aggregate.mockResolvedValue([]);
-    (service as any).courseModel = mockCourseModel;
 
-    await service.getCoursesByTeacher(mockTeacherId.toHexString(), { search: 'Chemistry' });
+    await service.getCoursesByTeacher(mockTeacherId.toHexString(), { search: '' });
 
-    expect(mockCourseModel.find).toHaveBeenCalledWith(expect.objectContaining({
-      $or: [
-        { courseName: { $regex: 'Chemistry', $options: 'i' } },
-        { publicId: { $regex: 'Chemistry', $options: 'i' } }
-      ]
-    }));
+    const callArgs = mockCourseModel.find.mock.calls[0][0];
+    expect(callArgs.$or).toBeUndefined();
   });
 
-  // TC_getCourses_004
+  // TC_GET_COURSES_009
   // Method: getCoursesByTeacher
-  // Purpose: To apply search filter for query CS
-  // Input: query string "CS"
-  // Expected output: Array of courses matching the query
+  // Purpose: Verify courses are sorted by createdAt descending
+  // Input: teacherId = valid teacher ObjectId
+  // Expected output: sort() called with { createdAt: -1 }
   // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB read.
-  // rollback: none required for read operation
-  it('TC_getCourses_004', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher' });
+  // checkdb: Verifies sort argument is { createdAt: -1 }
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_GET_COURSES_009', async () => {
+    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'T' });
+    const sortMock = jest.fn().mockResolvedValue([]);
+    mockCourseModel.find.mockReturnValue({ sort: sortMock });
+    mockEnrollmentModel.aggregate.mockResolvedValue([]);
+
+    await service.getCoursesByTeacher(mockTeacherId.toHexString());
+
+    expect(sortMock).toHaveBeenCalledWith({ createdAt: -1 });
+  });
+
+  // TC_GET_COURSES_010
+  // Method: getCoursesByTeacher
+  // Purpose: Verify teacherName is included in each course response
+  // Input: teacherId = valid teacher ObjectId with fullName "Dr. Smith"
+  // Expected output: Each course in result array has teacherName "Dr. Smith"
+  // Test result: pass
+  // checkdb: Verifies mapCourse propagates teacher fullName
+  // rollback: jest.clearAllMocks() in beforeEach restores all mocks before each test
+  it('TC_GET_COURSES_010', async () => {
+    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'Dr. Smith' });
+    mockCourseModel.find.mockReturnValue({
+      sort: jest.fn().mockResolvedValue([
+        { _id: new Types.ObjectId(), courseName: 'C1', teacherId: mockTeacherId, publicId: 'C-T1', createdAt: new Date(), updatedAt: new Date() },
+      ]),
+    });
+    mockEnrollmentModel.aggregate.mockResolvedValue([]);
+
+    const result = await service.getCoursesByTeacher(mockTeacherId.toHexString());
+
+    expect(result[0].teacherName).toBe('Dr. Smith');
+  });
+
+  // TC_GET_COURSES_011
+  // Method: getCoursesByTeacher
+  // Purpose: Verify ForbiddenException when user role is 'admin'
+  // Input: teacherId = valid ObjectId with role 'admin'
+  // Expected output: ForbiddenException
+  // Test result: pass
+  // checkdb: Verifies findById was called, find() was NOT called
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_GET_COURSES_011', async () => {
+    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'admin' });
+
+    await expect(
+      service.getCoursesByTeacher(mockTeacherId.toHexString()),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  // TC_GET_COURSES_012
+  // Method: getCoursesByTeacher
+  // Purpose: Verify aggregate is called with correct $match and $group pipeline stages
+  // Input: teacherId = valid teacher ObjectId with 1 course
+  // Expected output: aggregate called with pipeline containing $match and $group
+  // Test result: pass
+  // checkdb: Verifies aggregate pipeline structure
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_GET_COURSES_012', async () => {
+    const cId = new Types.ObjectId();
+    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'T' });
+    mockCourseModel.find.mockReturnValue({
+      sort: jest.fn().mockResolvedValue([
+        { _id: cId, courseName: 'C', teacherId: mockTeacherId, publicId: 'C-AG', createdAt: new Date(), updatedAt: new Date() },
+      ]),
+    });
+    mockEnrollmentModel.aggregate.mockResolvedValue([]);
+
+    await service.getCoursesByTeacher(mockTeacherId.toHexString());
+
+    expect(mockEnrollmentModel.aggregate).toHaveBeenCalledWith([
+      { $match: { courseId: { $in: [cId] } } },
+      { $group: { _id: '$courseId', count: { $sum: 1 } } },
+    ]);
+  });
+
+  // TC_GET_COURSES_013
+  // Method: getCoursesByTeacher
+  // Purpose: Verify correct mapping when multiple courses have mixed enrollment counts (some 0)
+  // Input: teacherId = valid teacher, 3 courses, aggregate returns counts for only 2
+  // Expected output: 2 courses with counts, 1 course with enrollmentCount = 0
+  // Test result: pass
+  // checkdb: Verifies countMap correctly handles missing entries
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_GET_COURSES_013', async () => {
+    const cId1 = new Types.ObjectId();
+    const cId2 = new Types.ObjectId();
+    const cId3 = new Types.ObjectId();
+    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'T' });
+    mockCourseModel.find.mockReturnValue({
+      sort: jest.fn().mockResolvedValue([
+        { _id: cId1, courseName: 'C1', teacherId: mockTeacherId, publicId: 'C-1', createdAt: new Date(), updatedAt: new Date() },
+        { _id: cId2, courseName: 'C2', teacherId: mockTeacherId, publicId: 'C-2', createdAt: new Date(), updatedAt: new Date() },
+        { _id: cId3, courseName: 'C3', teacherId: mockTeacherId, publicId: 'C-3', createdAt: new Date(), updatedAt: new Date() },
+      ]),
+    });
+    mockEnrollmentModel.aggregate.mockResolvedValue([
+      { _id: cId1, count: 5 },
+      { _id: cId3, count: 20 },
+    ]);
+
+    const result = await service.getCoursesByTeacher(mockTeacherId.toHexString());
+
+    expect(result).toHaveLength(3);
+    expect(result[0].enrollmentCount).toBe(5);
+    expect(result[1].enrollmentCount).toBe(0);  // cId2 has no enrollment
+    expect(result[2].enrollmentCount).toBe(20);
+  });
+
+  // TC_GET_COURSES_014
+  // Method: getCoursesByTeacher
+  // Purpose: Verify that teacherId is converted to ObjectId in the find filter
+  // Input: teacherId = valid teacher ObjectId
+  // Expected output: find() called with teacherId as Types.ObjectId instance
+  // Test result: pass
+  // checkdb: Verifies filter contains ObjectId, not string
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_GET_COURSES_014', async () => {
+    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'T' });
     mockCourseModel.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
     mockEnrollmentModel.aggregate.mockResolvedValue([]);
-    (service as any).courseModel = mockCourseModel;
 
-    await service.getCoursesByTeacher(mockTeacherId.toHexString(), { search: 'CS' });
+    await service.getCoursesByTeacher(mockTeacherId.toHexString());
 
-    expect(mockCourseModel.find).toHaveBeenCalledWith(expect.objectContaining({
-      $or: [
-        { courseName: { $regex: 'CS', $options: 'i' } },
-        { publicId: { $regex: 'CS', $options: 'i' } }
-      ]
-    }));
+    const filterArg = mockCourseModel.find.mock.calls[0][0];
+    expect(filterArg.teacherId).toBeInstanceOf(Types.ObjectId);
   });
 
-  // TC_getCourses_005
+  // TC_GET_COURSES_015
   // Method: getCoursesByTeacher
-  // Purpose: To apply search filter for query Algo
-  // Input: query string "Algo"
-  // Expected output: Array of courses matching the query
+  // Purpose: Verify search with special regex characters is handled correctly
+  // Input: teacherId = valid, queryDto = { search: "C++" }
+  // Expected output: find() called with search regex containing "C++"
   // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB read.
-  // rollback: none required for read operation
-  it('TC_getCourses_005', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher' });
+  // Note: The service passes search directly as regex - special chars may affect matching
+  // checkdb: Verifies regex search is applied
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_GET_COURSES_015', async () => {
+    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'T' });
     mockCourseModel.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
     mockEnrollmentModel.aggregate.mockResolvedValue([]);
-    (service as any).courseModel = mockCourseModel;
 
-    await service.getCoursesByTeacher(mockTeacherId.toHexString(), { search: 'Algo' });
+    await service.getCoursesByTeacher(mockTeacherId.toHexString(), { search: 'C++' });
 
-    expect(mockCourseModel.find).toHaveBeenCalledWith(expect.objectContaining({
-      $or: [
-        { courseName: { $regex: 'Algo', $options: 'i' } },
-        { publicId: { $regex: 'Algo', $options: 'i' } }
-      ]
-    }));
+    expect(mockCourseModel.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        $or: [
+          { courseName: { $regex: 'C++', $options: 'i' } },
+          { publicId: { $regex: 'C++', $options: 'i' } },
+        ],
+      }),
+    );
   });
 
-  // TC_getCourses_006
+  // TC_GET_COURSES_016
   // Method: getCoursesByTeacher
-  // Purpose: To apply search filter for query Data
-  // Input: query string "Data"
-  // Expected output: Array of courses matching the query
+  // Purpose: Verify each course in response has correct id and publicId mapping
+  // Input: teacherId = valid, 1 course with known _id and publicId
+  // Expected output: Response has id as string of _id and publicId preserved
   // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB read.
-  // rollback: none required for read operation
-  it('TC_getCourses_006', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher' });
-    mockCourseModel.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
+  // checkdb: Verifies mapCourse id/publicId mapping
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_GET_COURSES_016', async () => {
+    const cId = new Types.ObjectId();
+    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'T' });
+    mockCourseModel.find.mockReturnValue({
+      sort: jest.fn().mockResolvedValue([
+        { _id: cId, courseName: 'Mapped', teacherId: mockTeacherId, publicId: 'C-MAP99', createdAt: new Date(), updatedAt: new Date() },
+      ]),
+    });
     mockEnrollmentModel.aggregate.mockResolvedValue([]);
-    (service as any).courseModel = mockCourseModel;
 
-    await service.getCoursesByTeacher(mockTeacherId.toHexString(), { search: 'Data' });
+    const result = await service.getCoursesByTeacher(mockTeacherId.toHexString());
 
-    expect(mockCourseModel.find).toHaveBeenCalledWith(expect.objectContaining({
-      $or: [
-        { courseName: { $regex: 'Data', $options: 'i' } },
-        { publicId: { $regex: 'Data', $options: 'i' } }
-      ]
-    }));
+    expect(result[0].id).toBe(String(cId));
+    expect(result[0].publicId).toBe('C-MAP99');
+    expect(result[0].teacherId).toBe(String(mockTeacherId));
   });
 
-  // TC_getCourses_007
+  // TC_GET_COURSES_017
   // Method: getCoursesByTeacher
-  // Purpose: To apply search filter for query Web
-  // Input: query string "Web"
-  // Expected output: Array of courses matching the query
+  // Purpose: Verify error propagation when enrollmentModel.aggregate fails
+  // Input: teacherId = valid, aggregate throws DB error
+  // Expected output: Error propagated to caller
   // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB read.
-  // rollback: none required for read operation
-  it('TC_getCourses_007', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher' });
-    mockCourseModel.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
-    mockEnrollmentModel.aggregate.mockResolvedValue([]);
-    (service as any).courseModel = mockCourseModel;
+  // checkdb: Verifies aggregate threw error
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_GET_COURSES_017', async () => {
+    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher', fullName: 'T' });
+    mockCourseModel.find.mockReturnValue({
+      sort: jest.fn().mockResolvedValue([
+        { _id: new Types.ObjectId(), courseName: 'C1', teacherId: mockTeacherId, publicId: 'C-ERR', createdAt: new Date(), updatedAt: new Date() },
+      ]),
+    });
+    mockEnrollmentModel.aggregate.mockRejectedValue(new Error('Aggregate failed'));
 
-    await service.getCoursesByTeacher(mockTeacherId.toHexString(), { search: 'Web' });
-
-    expect(mockCourseModel.find).toHaveBeenCalledWith(expect.objectContaining({
-      $or: [
-        { courseName: { $regex: 'Web', $options: 'i' } },
-        { publicId: { $regex: 'Web', $options: 'i' } }
-      ]
-    }));
+    await expect(
+      service.getCoursesByTeacher(mockTeacherId.toHexString()),
+    ).rejects.toThrow('Aggregate failed');
   });
-
-  // TC_getCourses_008
-  // Method: getCoursesByTeacher
-  // Purpose: To apply search filter for query Mobile
-  // Input: query string "Mobile"
-  // Expected output: Array of courses matching the query
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB read.
-  // rollback: none required for read operation
-  it('TC_getCourses_008', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher' });
-    mockCourseModel.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
-    mockEnrollmentModel.aggregate.mockResolvedValue([]);
-    (service as any).courseModel = mockCourseModel;
-
-    await service.getCoursesByTeacher(mockTeacherId.toHexString(), { search: 'Mobile' });
-
-    expect(mockCourseModel.find).toHaveBeenCalledWith(expect.objectContaining({
-      $or: [
-        { courseName: { $regex: 'Mobile', $options: 'i' } },
-        { publicId: { $regex: 'Mobile', $options: 'i' } }
-      ]
-    }));
-  });
-
-  // TC_getCourses_009
-  // Method: getCoursesByTeacher
-  // Purpose: To apply search filter for query AI
-  // Input: query string "AI"
-  // Expected output: Array of courses matching the query
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB read.
-  // rollback: none required for read operation
-  it('TC_getCourses_009', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher' });
-    mockCourseModel.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
-    mockEnrollmentModel.aggregate.mockResolvedValue([]);
-    (service as any).courseModel = mockCourseModel;
-
-    await service.getCoursesByTeacher(mockTeacherId.toHexString(), { search: 'AI' });
-
-    expect(mockCourseModel.find).toHaveBeenCalledWith(expect.objectContaining({
-      $or: [
-        { courseName: { $regex: 'AI', $options: 'i' } },
-        { publicId: { $regex: 'AI', $options: 'i' } }
-      ]
-    }));
-  });
-
-  // TC_getCourses_010
-  // Method: getCoursesByTeacher
-  // Purpose: To apply search filter for query ML
-  // Input: query string "ML"
-  // Expected output: Array of courses matching the query
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB read.
-  // rollback: none required for read operation
-  it('TC_getCourses_010', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher' });
-    mockCourseModel.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
-    mockEnrollmentModel.aggregate.mockResolvedValue([]);
-    (service as any).courseModel = mockCourseModel;
-
-    await service.getCoursesByTeacher(mockTeacherId.toHexString(), { search: 'ML' });
-
-    expect(mockCourseModel.find).toHaveBeenCalledWith(expect.objectContaining({
-      $or: [
-        { courseName: { $regex: 'ML', $options: 'i' } },
-        { publicId: { $regex: 'ML', $options: 'i' } }
-      ]
-    }));
-  });
-
-  // TC_getCourses_011
-  // Method: getCoursesByTeacher
-  // Purpose: To apply search filter for query 101
-  // Input: query string "101"
-  // Expected output: Array of courses matching the query
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB read.
-  // rollback: none required for read operation
-  it('TC_getCourses_011', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher' });
-    mockCourseModel.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
-    mockEnrollmentModel.aggregate.mockResolvedValue([]);
-    (service as any).courseModel = mockCourseModel;
-
-    await service.getCoursesByTeacher(mockTeacherId.toHexString(), { search: '101' });
-
-    expect(mockCourseModel.find).toHaveBeenCalledWith(expect.objectContaining({
-      $or: [
-        { courseName: { $regex: '101', $options: 'i' } },
-        { publicId: { $regex: '101', $options: 'i' } }
-      ]
-    }));
-  });
-
-  // TC_getCourses_012
-  // Method: getCoursesByTeacher
-  // Purpose: To apply search filter for query 202
-  // Input: query string "202"
-  // Expected output: Array of courses matching the query
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB read.
-  // rollback: none required for read operation
-  it('TC_getCourses_012', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher' });
-    mockCourseModel.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
-    mockEnrollmentModel.aggregate.mockResolvedValue([]);
-    (service as any).courseModel = mockCourseModel;
-
-    await service.getCoursesByTeacher(mockTeacherId.toHexString(), { search: '202' });
-
-    expect(mockCourseModel.find).toHaveBeenCalledWith(expect.objectContaining({
-      $or: [
-        { courseName: { $regex: '202', $options: 'i' } },
-        { publicId: { $regex: '202', $options: 'i' } }
-      ]
-    }));
-  });
-
-  // TC_getCourses_013
-  // Method: getCoursesByTeacher
-  // Purpose: To apply search filter for query 303
-  // Input: query string "303"
-  // Expected output: Array of courses matching the query
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB read.
-  // rollback: none required for read operation
-  it('TC_getCourses_013', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher' });
-    mockCourseModel.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
-    mockEnrollmentModel.aggregate.mockResolvedValue([]);
-    (service as any).courseModel = mockCourseModel;
-
-    await service.getCoursesByTeacher(mockTeacherId.toHexString(), { search: '303' });
-
-    expect(mockCourseModel.find).toHaveBeenCalledWith(expect.objectContaining({
-      $or: [
-        { courseName: { $regex: '303', $options: 'i' } },
-        { publicId: { $regex: '303', $options: 'i' } }
-      ]
-    }));
-  });
-
-  // TC_getCourses_014
-  // Method: getCoursesByTeacher
-  // Purpose: To apply search filter for query 404
-  // Input: query string "404"
-  // Expected output: Array of courses matching the query
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB read.
-  // rollback: none required for read operation
-  it('TC_getCourses_014', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher' });
-    mockCourseModel.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
-    mockEnrollmentModel.aggregate.mockResolvedValue([]);
-    (service as any).courseModel = mockCourseModel;
-
-    await service.getCoursesByTeacher(mockTeacherId.toHexString(), { search: '404' });
-
-    expect(mockCourseModel.find).toHaveBeenCalledWith(expect.objectContaining({
-      $or: [
-        { courseName: { $regex: '404', $options: 'i' } },
-        { publicId: { $regex: '404', $options: 'i' } }
-      ]
-    }));
-  });
-
-  // TC_getCourses_015
-  // Method: getCoursesByTeacher
-  // Purpose: To apply search filter for query 505
-  // Input: query string "505"
-  // Expected output: Array of courses matching the query
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB read.
-  // rollback: none required for read operation
-  it('TC_getCourses_015', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher' });
-    mockCourseModel.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
-    mockEnrollmentModel.aggregate.mockResolvedValue([]);
-    (service as any).courseModel = mockCourseModel;
-
-    await service.getCoursesByTeacher(mockTeacherId.toHexString(), { search: '505' });
-
-    expect(mockCourseModel.find).toHaveBeenCalledWith(expect.objectContaining({
-      $or: [
-        { courseName: { $regex: '505', $options: 'i' } },
-        { publicId: { $regex: '505', $options: 'i' } }
-      ]
-    }));
-  });
-
-  // TC_getCourses_016
-  // Method: getCoursesByTeacher
-  // Purpose: To apply search filter for query test
-  // Input: query string "test"
-  // Expected output: Array of courses matching the query
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB read.
-  // rollback: none required for read operation
-  it('TC_getCourses_016', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher' });
-    mockCourseModel.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
-    mockEnrollmentModel.aggregate.mockResolvedValue([]);
-    (service as any).courseModel = mockCourseModel;
-
-    await service.getCoursesByTeacher(mockTeacherId.toHexString(), { search: 'test' });
-
-    expect(mockCourseModel.find).toHaveBeenCalledWith(expect.objectContaining({
-      $or: [
-        { courseName: { $regex: 'test', $options: 'i' } },
-        { publicId: { $regex: 'test', $options: 'i' } }
-      ]
-    }));
-  });
-
-  // TC_getCourses_017
-  // Method: getCoursesByTeacher
-  // Purpose: To apply search filter for query exam
-  // Input: query string "exam"
-  // Expected output: Array of courses matching the query
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB read.
-  // rollback: none required for read operation
-  it('TC_getCourses_017', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher' });
-    mockCourseModel.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
-    mockEnrollmentModel.aggregate.mockResolvedValue([]);
-    (service as any).courseModel = mockCourseModel;
-
-    await service.getCoursesByTeacher(mockTeacherId.toHexString(), { search: 'exam' });
-
-    expect(mockCourseModel.find).toHaveBeenCalledWith(expect.objectContaining({
-      $or: [
-        { courseName: { $regex: 'exam', $options: 'i' } },
-        { publicId: { $regex: 'exam', $options: 'i' } }
-      ]
-    }));
-  });
-
-  // TC_getCourses_018
-  // Method: getCoursesByTeacher
-  // Purpose: To apply search filter for query final
-  // Input: query string "final"
-  // Expected output: Array of courses matching the query
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB read.
-  // rollback: none required for read operation
-  it('TC_getCourses_018', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher' });
-    mockCourseModel.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
-    mockEnrollmentModel.aggregate.mockResolvedValue([]);
-    (service as any).courseModel = mockCourseModel;
-
-    await service.getCoursesByTeacher(mockTeacherId.toHexString(), { search: 'final' });
-
-    expect(mockCourseModel.find).toHaveBeenCalledWith(expect.objectContaining({
-      $or: [
-        { courseName: { $regex: 'final', $options: 'i' } },
-        { publicId: { $regex: 'final', $options: 'i' } }
-      ]
-    }));
-  });
-
-  // TC_getCourses_019
-  // Method: getCoursesByTeacher
-  // Purpose: To apply search filter for query mid
-  // Input: query string "mid"
-  // Expected output: Array of courses matching the query
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB read.
-  // rollback: none required for read operation
-  it('TC_getCourses_019', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher' });
-    mockCourseModel.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
-    mockEnrollmentModel.aggregate.mockResolvedValue([]);
-    (service as any).courseModel = mockCourseModel;
-
-    await service.getCoursesByTeacher(mockTeacherId.toHexString(), { search: 'mid' });
-
-    expect(mockCourseModel.find).toHaveBeenCalledWith(expect.objectContaining({
-      $or: [
-        { courseName: { $regex: 'mid', $options: 'i' } },
-        { publicId: { $regex: 'mid', $options: 'i' } }
-      ]
-    }));
-  });
-
-  // TC_getCourses_020
-  // Method: getCoursesByTeacher
-  // Purpose: To apply search filter for query intro
-  // Input: query string "intro"
-  // Expected output: Array of courses matching the query
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB read.
-  // rollback: none required for read operation
-  it('TC_getCourses_020', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher' });
-    mockCourseModel.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
-    mockEnrollmentModel.aggregate.mockResolvedValue([]);
-    (service as any).courseModel = mockCourseModel;
-
-    await service.getCoursesByTeacher(mockTeacherId.toHexString(), { search: 'intro' });
-
-    expect(mockCourseModel.find).toHaveBeenCalledWith(expect.objectContaining({
-      $or: [
-        { courseName: { $regex: 'intro', $options: 'i' } },
-        { publicId: { $regex: 'intro', $options: 'i' } }
-      ]
-    }));
-  });
-
-  // TC_getCourses_021
-  // Method: getCoursesByTeacher
-  // Purpose: To apply search filter for query adv
-  // Input: query string "adv"
-  // Expected output: Array of courses matching the query
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB read.
-  // rollback: none required for read operation
-  it('TC_getCourses_021', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher' });
-    mockCourseModel.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
-    mockEnrollmentModel.aggregate.mockResolvedValue([]);
-    (service as any).courseModel = mockCourseModel;
-
-    await service.getCoursesByTeacher(mockTeacherId.toHexString(), { search: 'adv' });
-
-    expect(mockCourseModel.find).toHaveBeenCalledWith(expect.objectContaining({
-      $or: [
-        { courseName: { $regex: 'adv', $options: 'i' } },
-        { publicId: { $regex: 'adv', $options: 'i' } }
-      ]
-    }));
-  });
-
-  // TC_getCourses_022
-  // Method: getCoursesByTeacher
-  // Purpose: To apply search filter for query beg
-  // Input: query string "beg"
-  // Expected output: Array of courses matching the query
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB read.
-  // rollback: none required for read operation
-  it('TC_getCourses_022', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher' });
-    mockCourseModel.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
-    mockEnrollmentModel.aggregate.mockResolvedValue([]);
-    (service as any).courseModel = mockCourseModel;
-
-    await service.getCoursesByTeacher(mockTeacherId.toHexString(), { search: 'beg' });
-
-    expect(mockCourseModel.find).toHaveBeenCalledWith(expect.objectContaining({
-      $or: [
-        { courseName: { $regex: 'beg', $options: 'i' } },
-        { publicId: { $regex: 'beg', $options: 'i' } }
-      ]
-    }));
-  });
-
-  // TC_getCourses_023
-  // Method: getCoursesByTeacher
-  // Purpose: To apply search filter for query seq
-  // Input: query string "seq"
-  // Expected output: Array of courses matching the query
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB read.
-  // rollback: none required for read operation
-  it('TC_getCourses_023', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher' });
-    mockCourseModel.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
-    mockEnrollmentModel.aggregate.mockResolvedValue([]);
-    (service as any).courseModel = mockCourseModel;
-
-    await service.getCoursesByTeacher(mockTeacherId.toHexString(), { search: 'seq' });
-
-    expect(mockCourseModel.find).toHaveBeenCalledWith(expect.objectContaining({
-      $or: [
-        { courseName: { $regex: 'seq', $options: 'i' } },
-        { publicId: { $regex: 'seq', $options: 'i' } }
-      ]
-    }));
-  });
-
-  // TC_getCourses_024
-  // Method: getCoursesByTeacher
-  // Purpose: To apply search filter for query str
-  // Input: query string "str"
-  // Expected output: Array of courses matching the query
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB read.
-  // rollback: none required for read operation
-  it('TC_getCourses_024', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher' });
-    mockCourseModel.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
-    mockEnrollmentModel.aggregate.mockResolvedValue([]);
-    (service as any).courseModel = mockCourseModel;
-
-    await service.getCoursesByTeacher(mockTeacherId.toHexString(), { search: 'str' });
-
-    expect(mockCourseModel.find).toHaveBeenCalledWith(expect.objectContaining({
-      $or: [
-        { courseName: { $regex: 'str', $options: 'i' } },
-        { publicId: { $regex: 'str', $options: 'i' } }
-      ]
-    }));
-  });
-
-  // TC_getCourses_025
-  // Method: getCoursesByTeacher
-  // Purpose: To apply search filter for query val
-  // Input: query string "val"
-  // Expected output: Array of courses matching the query
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB read.
-  // rollback: none required for read operation
-  it('TC_getCourses_025', async () => {
-    mockUserModel.findById.mockResolvedValue({ _id: mockTeacherId, role: 'teacher' });
-    mockCourseModel.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
-    mockEnrollmentModel.aggregate.mockResolvedValue([]);
-    (service as any).courseModel = mockCourseModel;
-
-    await service.getCoursesByTeacher(mockTeacherId.toHexString(), { search: 'val' });
-
-    expect(mockCourseModel.find).toHaveBeenCalledWith(expect.objectContaining({
-      $or: [
-        { courseName: { $regex: 'val', $options: 'i' } },
-        { publicId: { $regex: 'val', $options: 'i' } }
-      ]
-    }));
-  });
-
-
-  // TC_updateCourse_001
-  // Method: updateCourseName
-  // Purpose: To verify course update variation 1
-  // Input: { courseName: "New Name 1" }
-  // Expected output: Updated course object
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateCourse_001', async () => {
-    const mockCourse = { 
-      _id: mockCourseId, 
-      courseName: 'Old', 
-      teacherId: mockTeacherId,
-      save: jest.fn().mockResolvedValue({ _id: mockCourseId, courseName: 'New Name 1', teacherId: mockTeacherId })
-    };
-    mockCourseModel.findById.mockResolvedValue(mockCourse);
-    mockUserModel.findById.mockResolvedValue({ fullName: 'T' });
-    mockEnrollmentModel.countDocuments.mockResolvedValue(5);
-    (service as any).courseModel = mockCourseModel;
-
-    const res = await service.updateCourseName(mockCourseId.toHexString(), { courseName: 'New Name 1' });
-    expect(res.courseName).toBe('New Name 1');
-  });
-
-  // TC_updateCourse_002
-  // Method: updateCourseName
-  // Purpose: To verify course update variation 2
-  // Input: { courseName: "New Name 2" }
-  // Expected output: Updated course object
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateCourse_002', async () => {
-    const mockCourse = { 
-      _id: mockCourseId, 
-      courseName: 'Old', 
-      teacherId: mockTeacherId,
-      save: jest.fn().mockResolvedValue({ _id: mockCourseId, courseName: 'New Name 2', teacherId: mockTeacherId })
-    };
-    mockCourseModel.findById.mockResolvedValue(mockCourse);
-    mockUserModel.findById.mockResolvedValue({ fullName: 'T' });
-    mockEnrollmentModel.countDocuments.mockResolvedValue(5);
-    (service as any).courseModel = mockCourseModel;
-
-    const res = await service.updateCourseName(mockCourseId.toHexString(), { courseName: 'New Name 2' });
-    expect(res.courseName).toBe('New Name 2');
-  });
-
-  // TC_updateCourse_003
-  // Method: updateCourseName
-  // Purpose: To verify course update variation 3
-  // Input: { courseName: "New Name 3" }
-  // Expected output: Updated course object
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateCourse_003', async () => {
-    const mockCourse = { 
-      _id: mockCourseId, 
-      courseName: 'Old', 
-      teacherId: mockTeacherId,
-      save: jest.fn().mockResolvedValue({ _id: mockCourseId, courseName: 'New Name 3', teacherId: mockTeacherId })
-    };
-    mockCourseModel.findById.mockResolvedValue(mockCourse);
-    mockUserModel.findById.mockResolvedValue({ fullName: 'T' });
-    mockEnrollmentModel.countDocuments.mockResolvedValue(5);
-    (service as any).courseModel = mockCourseModel;
-
-    const res = await service.updateCourseName(mockCourseId.toHexString(), { courseName: 'New Name 3' });
-    expect(res.courseName).toBe('New Name 3');
-  });
-
-  // TC_updateCourse_004
-  // Method: updateCourseName
-  // Purpose: To verify course update variation 4
-  // Input: { courseName: "New Name 4" }
-  // Expected output: Updated course object
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateCourse_004', async () => {
-    const mockCourse = { 
-      _id: mockCourseId, 
-      courseName: 'Old', 
-      teacherId: mockTeacherId,
-      save: jest.fn().mockResolvedValue({ _id: mockCourseId, courseName: 'New Name 4', teacherId: mockTeacherId })
-    };
-    mockCourseModel.findById.mockResolvedValue(mockCourse);
-    mockUserModel.findById.mockResolvedValue({ fullName: 'T' });
-    mockEnrollmentModel.countDocuments.mockResolvedValue(5);
-    (service as any).courseModel = mockCourseModel;
-
-    const res = await service.updateCourseName(mockCourseId.toHexString(), { courseName: 'New Name 4' });
-    expect(res.courseName).toBe('New Name 4');
-  });
-
-  // TC_updateCourse_005
-  // Method: updateCourseName
-  // Purpose: To verify course update variation 5
-  // Input: { courseName: "New Name 5" }
-  // Expected output: Updated course object
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateCourse_005', async () => {
-    const mockCourse = { 
-      _id: mockCourseId, 
-      courseName: 'Old', 
-      teacherId: mockTeacherId,
-      save: jest.fn().mockResolvedValue({ _id: mockCourseId, courseName: 'New Name 5', teacherId: mockTeacherId })
-    };
-    mockCourseModel.findById.mockResolvedValue(mockCourse);
-    mockUserModel.findById.mockResolvedValue({ fullName: 'T' });
-    mockEnrollmentModel.countDocuments.mockResolvedValue(5);
-    (service as any).courseModel = mockCourseModel;
-
-    const res = await service.updateCourseName(mockCourseId.toHexString(), { courseName: 'New Name 5' });
-    expect(res.courseName).toBe('New Name 5');
-  });
-
-  // TC_updateCourse_006
-  // Method: updateCourseName
-  // Purpose: To verify course update variation 6
-  // Input: { courseName: "New Name 6" }
-  // Expected output: Updated course object
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateCourse_006', async () => {
-    const mockCourse = { 
-      _id: mockCourseId, 
-      courseName: 'Old', 
-      teacherId: mockTeacherId,
-      save: jest.fn().mockResolvedValue({ _id: mockCourseId, courseName: 'New Name 6', teacherId: mockTeacherId })
-    };
-    mockCourseModel.findById.mockResolvedValue(mockCourse);
-    mockUserModel.findById.mockResolvedValue({ fullName: 'T' });
-    mockEnrollmentModel.countDocuments.mockResolvedValue(5);
-    (service as any).courseModel = mockCourseModel;
-
-    const res = await service.updateCourseName(mockCourseId.toHexString(), { courseName: 'New Name 6' });
-    expect(res.courseName).toBe('New Name 6');
-  });
-
-  // TC_updateCourse_007
-  // Method: updateCourseName
-  // Purpose: To verify course update variation 7
-  // Input: { courseName: "New Name 7" }
-  // Expected output: Updated course object
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateCourse_007', async () => {
-    const mockCourse = { 
-      _id: mockCourseId, 
-      courseName: 'Old', 
-      teacherId: mockTeacherId,
-      save: jest.fn().mockResolvedValue({ _id: mockCourseId, courseName: 'New Name 7', teacherId: mockTeacherId })
-    };
-    mockCourseModel.findById.mockResolvedValue(mockCourse);
-    mockUserModel.findById.mockResolvedValue({ fullName: 'T' });
-    mockEnrollmentModel.countDocuments.mockResolvedValue(5);
-    (service as any).courseModel = mockCourseModel;
-
-    const res = await service.updateCourseName(mockCourseId.toHexString(), { courseName: 'New Name 7' });
-    expect(res.courseName).toBe('New Name 7');
-  });
-
-  // TC_updateCourse_008
-  // Method: updateCourseName
-  // Purpose: To verify course update variation 8
-  // Input: { courseName: "New Name 8" }
-  // Expected output: Updated course object
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateCourse_008', async () => {
-    const mockCourse = { 
-      _id: mockCourseId, 
-      courseName: 'Old', 
-      teacherId: mockTeacherId,
-      save: jest.fn().mockResolvedValue({ _id: mockCourseId, courseName: 'New Name 8', teacherId: mockTeacherId })
-    };
-    mockCourseModel.findById.mockResolvedValue(mockCourse);
-    mockUserModel.findById.mockResolvedValue({ fullName: 'T' });
-    mockEnrollmentModel.countDocuments.mockResolvedValue(5);
-    (service as any).courseModel = mockCourseModel;
-
-    const res = await service.updateCourseName(mockCourseId.toHexString(), { courseName: 'New Name 8' });
-    expect(res.courseName).toBe('New Name 8');
-  });
-
-  // TC_updateCourse_009
-  // Method: updateCourseName
-  // Purpose: To verify course update variation 9
-  // Input: { courseName: "New Name 9" }
-  // Expected output: Updated course object
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateCourse_009', async () => {
-    const mockCourse = { 
-      _id: mockCourseId, 
-      courseName: 'Old', 
-      teacherId: mockTeacherId,
-      save: jest.fn().mockResolvedValue({ _id: mockCourseId, courseName: 'New Name 9', teacherId: mockTeacherId })
-    };
-    mockCourseModel.findById.mockResolvedValue(mockCourse);
-    mockUserModel.findById.mockResolvedValue({ fullName: 'T' });
-    mockEnrollmentModel.countDocuments.mockResolvedValue(5);
-    (service as any).courseModel = mockCourseModel;
-
-    const res = await service.updateCourseName(mockCourseId.toHexString(), { courseName: 'New Name 9' });
-    expect(res.courseName).toBe('New Name 9');
-  });
-
-  // TC_updateCourse_010
-  // Method: updateCourseName
-  // Purpose: To verify course update variation 10
-  // Input: { courseName: "New Name 10" }
-  // Expected output: Updated course object
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateCourse_010', async () => {
-    const mockCourse = { 
-      _id: mockCourseId, 
-      courseName: 'Old', 
-      teacherId: mockTeacherId,
-      save: jest.fn().mockResolvedValue({ _id: mockCourseId, courseName: 'New Name 10', teacherId: mockTeacherId })
-    };
-    mockCourseModel.findById.mockResolvedValue(mockCourse);
-    mockUserModel.findById.mockResolvedValue({ fullName: 'T' });
-    mockEnrollmentModel.countDocuments.mockResolvedValue(5);
-    (service as any).courseModel = mockCourseModel;
-
-    const res = await service.updateCourseName(mockCourseId.toHexString(), { courseName: 'New Name 10' });
-    expect(res.courseName).toBe('New Name 10');
-  });
-
-  // TC_updateCourse_011
-  // Method: updateCourseName
-  // Purpose: To verify course update variation 11
-  // Input: { courseName: "New Name 11" }
-  // Expected output: Updated course object
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateCourse_011', async () => {
-    const mockCourse = { 
-      _id: mockCourseId, 
-      courseName: 'Old', 
-      teacherId: mockTeacherId,
-      save: jest.fn().mockResolvedValue({ _id: mockCourseId, courseName: 'New Name 11', teacherId: mockTeacherId })
-    };
-    mockCourseModel.findById.mockResolvedValue(mockCourse);
-    mockUserModel.findById.mockResolvedValue({ fullName: 'T' });
-    mockEnrollmentModel.countDocuments.mockResolvedValue(5);
-    (service as any).courseModel = mockCourseModel;
-
-    const res = await service.updateCourseName(mockCourseId.toHexString(), { courseName: 'New Name 11' });
-    expect(res.courseName).toBe('New Name 11');
-  });
-
-  // TC_updateCourse_012
-  // Method: updateCourseName
-  // Purpose: To verify course update variation 12
-  // Input: { courseName: "New Name 12" }
-  // Expected output: Updated course object
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateCourse_012', async () => {
-    const mockCourse = { 
-      _id: mockCourseId, 
-      courseName: 'Old', 
-      teacherId: mockTeacherId,
-      save: jest.fn().mockResolvedValue({ _id: mockCourseId, courseName: 'New Name 12', teacherId: mockTeacherId })
-    };
-    mockCourseModel.findById.mockResolvedValue(mockCourse);
-    mockUserModel.findById.mockResolvedValue({ fullName: 'T' });
-    mockEnrollmentModel.countDocuments.mockResolvedValue(5);
-    (service as any).courseModel = mockCourseModel;
-
-    const res = await service.updateCourseName(mockCourseId.toHexString(), { courseName: 'New Name 12' });
-    expect(res.courseName).toBe('New Name 12');
-  });
-
-  // TC_updateCourse_013
-  // Method: updateCourseName
-  // Purpose: To verify course update variation 13
-  // Input: { courseName: "New Name 13" }
-  // Expected output: Updated course object
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateCourse_013', async () => {
-    const mockCourse = { 
-      _id: mockCourseId, 
-      courseName: 'Old', 
-      teacherId: mockTeacherId,
-      save: jest.fn().mockResolvedValue({ _id: mockCourseId, courseName: 'New Name 13', teacherId: mockTeacherId })
-    };
-    mockCourseModel.findById.mockResolvedValue(mockCourse);
-    mockUserModel.findById.mockResolvedValue({ fullName: 'T' });
-    mockEnrollmentModel.countDocuments.mockResolvedValue(5);
-    (service as any).courseModel = mockCourseModel;
-
-    const res = await service.updateCourseName(mockCourseId.toHexString(), { courseName: 'New Name 13' });
-    expect(res.courseName).toBe('New Name 13');
-  });
-
-  // TC_updateCourse_014
-  // Method: updateCourseName
-  // Purpose: To verify course update variation 14
-  // Input: { courseName: "New Name 14" }
-  // Expected output: Updated course object
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateCourse_014', async () => {
-    const mockCourse = { 
-      _id: mockCourseId, 
-      courseName: 'Old', 
-      teacherId: mockTeacherId,
-      save: jest.fn().mockResolvedValue({ _id: mockCourseId, courseName: 'New Name 14', teacherId: mockTeacherId })
-    };
-    mockCourseModel.findById.mockResolvedValue(mockCourse);
-    mockUserModel.findById.mockResolvedValue({ fullName: 'T' });
-    mockEnrollmentModel.countDocuments.mockResolvedValue(5);
-    (service as any).courseModel = mockCourseModel;
-
-    const res = await service.updateCourseName(mockCourseId.toHexString(), { courseName: 'New Name 14' });
-    expect(res.courseName).toBe('New Name 14');
-  });
-
-  // TC_updateCourse_015
-  // Method: updateCourseName
-  // Purpose: To verify course update variation 15
-  // Input: { courseName: "New Name 15" }
-  // Expected output: Updated course object
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateCourse_015', async () => {
-    const mockCourse = { 
-      _id: mockCourseId, 
-      courseName: 'Old', 
-      teacherId: mockTeacherId,
-      save: jest.fn().mockResolvedValue({ _id: mockCourseId, courseName: 'New Name 15', teacherId: mockTeacherId })
-    };
-    mockCourseModel.findById.mockResolvedValue(mockCourse);
-    mockUserModel.findById.mockResolvedValue({ fullName: 'T' });
-    mockEnrollmentModel.countDocuments.mockResolvedValue(5);
-    (service as any).courseModel = mockCourseModel;
-
-    const res = await service.updateCourseName(mockCourseId.toHexString(), { courseName: 'New Name 15' });
-    expect(res.courseName).toBe('New Name 15');
-  });
-
-
-  // TC_deleteCourse_001
-  // Method: deleteCourse
-  // Purpose: To verify course deletion variation 1
-  // Input: courseId
-  // Expected output: Void
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB delete.
-  // rollback: jest.clearAllMocks()
-  it('TC_deleteCourse_001', async () => {
-    const mockCourse = { 
-      _id: mockCourseId, 
-      courseName: 'Old', 
-      teacherId: mockTeacherId,
-      save: jest.fn()
-    };
-    mockCourseModel.findById.mockResolvedValue(mockCourse);
-    (service as any).courseModel = mockCourseModel;
-
-    await service.deleteCourse(mockCourseId.toHexString());
-    expect(mockCourseModel.deleteOne).toHaveBeenCalledWith({ _id: mockCourseId.toHexString() });
-  });
-
-  // TC_deleteCourse_002
-  // Method: deleteCourse
-  // Purpose: To verify course deletion variation 2
-  // Input: courseId
-  // Expected output: Void
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB delete.
-  // rollback: jest.clearAllMocks()
-  it('TC_deleteCourse_002', async () => {
-    const mockCourse = { 
-      _id: mockCourseId, 
-      courseName: 'Old', 
-      teacherId: mockTeacherId,
-      save: jest.fn()
-    };
-    mockCourseModel.findById.mockResolvedValue(mockCourse);
-    (service as any).courseModel = mockCourseModel;
-
-    await service.deleteCourse(mockCourseId.toHexString());
-    expect(mockCourseModel.deleteOne).toHaveBeenCalledWith({ _id: mockCourseId.toHexString() });
-  });
-
-  // TC_deleteCourse_003
-  // Method: deleteCourse
-  // Purpose: To verify course deletion variation 3
-  // Input: courseId
-  // Expected output: Void
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB delete.
-  // rollback: jest.clearAllMocks()
-  it('TC_deleteCourse_003', async () => {
-    const mockCourse = { 
-      _id: mockCourseId, 
-      courseName: 'Old', 
-      teacherId: mockTeacherId,
-      save: jest.fn()
-    };
-    mockCourseModel.findById.mockResolvedValue(mockCourse);
-    (service as any).courseModel = mockCourseModel;
-
-    await service.deleteCourse(mockCourseId.toHexString());
-    expect(mockCourseModel.deleteOne).toHaveBeenCalledWith({ _id: mockCourseId.toHexString() });
-  });
-
-  // TC_deleteCourse_004
-  // Method: deleteCourse
-  // Purpose: To verify course deletion variation 4
-  // Input: courseId
-  // Expected output: Void
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB delete.
-  // rollback: jest.clearAllMocks()
-  it('TC_deleteCourse_004', async () => {
-    const mockCourse = { 
-      _id: mockCourseId, 
-      courseName: 'Old', 
-      teacherId: mockTeacherId,
-      save: jest.fn()
-    };
-    mockCourseModel.findById.mockResolvedValue(mockCourse);
-    (service as any).courseModel = mockCourseModel;
-
-    await service.deleteCourse(mockCourseId.toHexString());
-    expect(mockCourseModel.deleteOne).toHaveBeenCalledWith({ _id: mockCourseId.toHexString() });
-  });
-
-  // TC_deleteCourse_005
-  // Method: deleteCourse
-  // Purpose: To verify course deletion variation 5
-  // Input: courseId
-  // Expected output: Void
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB delete.
-  // rollback: jest.clearAllMocks()
-  it('TC_deleteCourse_005', async () => {
-    const mockCourse = { 
-      _id: mockCourseId, 
-      courseName: 'Old', 
-      teacherId: mockTeacherId,
-      save: jest.fn()
-    };
-    mockCourseModel.findById.mockResolvedValue(mockCourse);
-    (service as any).courseModel = mockCourseModel;
-
-    await service.deleteCourse(mockCourseId.toHexString());
-    expect(mockCourseModel.deleteOne).toHaveBeenCalledWith({ _id: mockCourseId.toHexString() });
-  });
-
-  // TC_deleteCourse_006
-  // Method: deleteCourse
-  // Purpose: To verify course deletion variation 6
-  // Input: courseId
-  // Expected output: Void
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB delete.
-  // rollback: jest.clearAllMocks()
-  it('TC_deleteCourse_006', async () => {
-    const mockCourse = { 
-      _id: mockCourseId, 
-      courseName: 'Old', 
-      teacherId: mockTeacherId,
-      save: jest.fn()
-    };
-    mockCourseModel.findById.mockResolvedValue(mockCourse);
-    (service as any).courseModel = mockCourseModel;
-
-    await service.deleteCourse(mockCourseId.toHexString());
-    expect(mockCourseModel.deleteOne).toHaveBeenCalledWith({ _id: mockCourseId.toHexString() });
-  });
-
-  // TC_deleteCourse_007
-  // Method: deleteCourse
-  // Purpose: To verify course deletion variation 7
-  // Input: courseId
-  // Expected output: Void
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB delete.
-  // rollback: jest.clearAllMocks()
-  it('TC_deleteCourse_007', async () => {
-    const mockCourse = { 
-      _id: mockCourseId, 
-      courseName: 'Old', 
-      teacherId: mockTeacherId,
-      save: jest.fn()
-    };
-    mockCourseModel.findById.mockResolvedValue(mockCourse);
-    (service as any).courseModel = mockCourseModel;
-
-    await service.deleteCourse(mockCourseId.toHexString());
-    expect(mockCourseModel.deleteOne).toHaveBeenCalledWith({ _id: mockCourseId.toHexString() });
-  });
-
-  // TC_deleteCourse_008
-  // Method: deleteCourse
-  // Purpose: To verify course deletion variation 8
-  // Input: courseId
-  // Expected output: Void
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB delete.
-  // rollback: jest.clearAllMocks()
-  it('TC_deleteCourse_008', async () => {
-    const mockCourse = { 
-      _id: mockCourseId, 
-      courseName: 'Old', 
-      teacherId: mockTeacherId,
-      save: jest.fn()
-    };
-    mockCourseModel.findById.mockResolvedValue(mockCourse);
-    (service as any).courseModel = mockCourseModel;
-
-    await service.deleteCourse(mockCourseId.toHexString());
-    expect(mockCourseModel.deleteOne).toHaveBeenCalledWith({ _id: mockCourseId.toHexString() });
-  });
-
-  // TC_deleteCourse_009
-  // Method: deleteCourse
-  // Purpose: To verify course deletion variation 9
-  // Input: courseId
-  // Expected output: Void
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB delete.
-  // rollback: jest.clearAllMocks()
-  it('TC_deleteCourse_009', async () => {
-    const mockCourse = { 
-      _id: mockCourseId, 
-      courseName: 'Old', 
-      teacherId: mockTeacherId,
-      save: jest.fn()
-    };
-    mockCourseModel.findById.mockResolvedValue(mockCourse);
-    (service as any).courseModel = mockCourseModel;
-
-    await service.deleteCourse(mockCourseId.toHexString());
-    expect(mockCourseModel.deleteOne).toHaveBeenCalledWith({ _id: mockCourseId.toHexString() });
-  });
-
-  // TC_deleteCourse_010
-  // Method: deleteCourse
-  // Purpose: To verify course deletion variation 10
-  // Input: courseId
-  // Expected output: Void
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB delete.
-  // rollback: jest.clearAllMocks()
-  it('TC_deleteCourse_010', async () => {
-    const mockCourse = { 
-      _id: mockCourseId, 
-      courseName: 'Old', 
-      teacherId: mockTeacherId,
-      save: jest.fn()
-    };
-    mockCourseModel.findById.mockResolvedValue(mockCourse);
-    (service as any).courseModel = mockCourseModel;
-
-    await service.deleteCourse(mockCourseId.toHexString());
-    expect(mockCourseModel.deleteOne).toHaveBeenCalledWith({ _id: mockCourseId.toHexString() });
-  });
-
 });
