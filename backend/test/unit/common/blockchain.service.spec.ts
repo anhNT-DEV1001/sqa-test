@@ -65,7 +65,7 @@ describe('BlockchainService', () => {
   // issueCertificate
   // ────────────────────────────────────────────────────────────────────────
 
-  // Test Case ID: TC_BLOCK_01
+  // Test Case ID: TC_CRT_01
   it('should_IssueCertificate_When_ValidParams', async () => {
     const txHash = '0xtxhash123';
     mockMint.mockResolvedValue({ hash: txHash, wait: mockWait });
@@ -96,7 +96,7 @@ describe('BlockchainService', () => {
     );
   });
 
-  // Test Case ID: TC_BLOCK_02
+  // Test Case ID: TC_CRT_02
   it('should_ThrowError_When_SignerNotInitialized', async () => {
     const moduleNoSigner: TestingModule = await Test.createTestingModule({
       providers: [
@@ -124,7 +124,7 @@ describe('BlockchainService', () => {
     ).rejects.toThrow('Failed to mint certificate NFT');
   });
 
-  // Test Case ID: TC_BLOCK_03
+  // Test Case ID: TC_CRT_03
   it('should_UseDefaultRecipient_When_InvalidAddress', async () => {
     const txHash = '0xtxhash456';
     mockMint.mockResolvedValue({ hash: txHash, wait: mockWait });
@@ -143,7 +143,7 @@ describe('BlockchainService', () => {
     );
   });
 
-  // Test Case ID: TC_BLOCK_04
+  // Test Case ID: TC_CRT_04
   it('should_HandleTransferEventParseFailure_Gracefully', async () => {
     const txHash = '0xtxhash789';
     mockMint.mockResolvedValue({ hash: txHash, wait: mockWait });
@@ -163,7 +163,7 @@ describe('BlockchainService', () => {
     expect(result.transactionHash).toBe(txHash);
   });
 
-  // Test Case ID: TC_BLOCK_05
+  // Test Case ID: TC_CRT_05
   it('should_ThrowError_When_MintTransactionFails', async () => {
     mockMint.mockRejectedValue(new Error('insufficient funds'));
 
@@ -175,7 +175,7 @@ describe('BlockchainService', () => {
     ).rejects.toThrow('Failed to mint certificate NFT');
   });
 
-  // Test Case ID: TC_BLOCK_06
+  // Test Case ID: TC_CRT_06
   it('should_ThrowError_When_IpfsHashEmpty', async () => {
     await expect(
       service.issueCertificate({
@@ -189,7 +189,7 @@ describe('BlockchainService', () => {
   // getCertificate
   // ────────────────────────────────────────────────────────────────────────
 
-  // Test Case ID: TC_BLOCK_07
+  // Test Case ID: TC_CRT_07
   it('should_GetCertificate_When_ValidTokenId', async () => {
     mockOwnerOf.mockResolvedValue('0xOwnerAddress');
     mockTokenURI.mockResolvedValue('ipfs://QmMetadata');
@@ -206,7 +206,7 @@ describe('BlockchainService', () => {
     });
   });
 
-  // Test Case ID: TC_BLOCK_08
+  // Test Case ID: TC_CRT_08
   it('should_ThrowError_When_GetCertificateTokenNotFound', async () => {
     mockOwnerOf.mockRejectedValue(new Error('ERC721: invalid token ID'));
 
@@ -219,7 +219,7 @@ describe('BlockchainService', () => {
   // verifyCertificate
   // ────────────────────────────────────────────────────────────────────────
 
-  // Test Case ID: TC_BLOCK_09
+  // Test Case ID: TC_CRT_09
   it('should_VerifyCertificate_When_ValidToken', async () => {
     mockOwnerOf.mockResolvedValue('0xOwner');
     mockTokenURI.mockResolvedValue('ipfs://QmValid');
@@ -231,7 +231,7 @@ describe('BlockchainService', () => {
     expect(result.certificate.cid).toBe('ipfs://QmValid');
   });
 
-  // Test Case ID: TC_BLOCK_10
+  // Test Case ID: TC_CRT_10
   it('should_ThrowError_When_VerifyCertificateTokenInvalid', async () => {
     mockOwnerOf.mockRejectedValue(new Error('token does not exist'));
 
@@ -244,33 +244,29 @@ describe('BlockchainService', () => {
   // Unsupported methods
   // ────────────────────────────────────────────────────────────────────────
 
-  // Test Case ID: TC_BLOCK_11
+  // Test Case ID: TC_CRT_11
   it('should_RejectRevokeCertificate_AsUnsupported', async () => {
     await expect(service.revokeCertificate('1')).rejects.toThrow(
       'revokeCertificate is not supported',
     );
   });
 
-  // Test Case ID: TC_BLOCK_12
+  // Test Case ID: TC_CRT_12
   it('should_RejectVerifyCertificateByCID_AsUnsupported', async () => {
     await expect(service.verifyCertificateByCID('QmTest')).rejects.toThrow(
       'verifyCertificateByCID is not supported',
     );
   });
 
-  // Test Case ID: TC_BLOCK_13
+  // Test Case ID: TC_CRT_13
   it('should_RejectGetCertificateIdByCID_AsUnsupported', async () => {
     await expect(service.getCertificateIdByCID('QmTest')).rejects.toThrow(
       'getCertificateIdByCID is not supported',
     );
   });
 
-  // ════════════════════════════════════════════════════════════════════════
-  // BUG-FINDING TEST CASES — These tests SHOULD pass but will FAIL,
-  // exposing real bugs in the source code.
-  // ════════════════════════════════════════════════════════════════════════
 
-  // Test Case ID: TC_BLOCK_BUG_01
+  // Test Case ID: TC_CRT_14
   // BUG: getCertificate() returns hardcoded `issuedAt: BigInt(0)` instead
   // of reading the actual issuance timestamp from the blockchain.
   // Source: blockchain.service.ts line 241
@@ -289,7 +285,7 @@ describe('BlockchainService', () => {
     expect(result.issuedAt).not.toBe(BigInt(0));
   });
 
-  // Test Case ID: TC_BLOCK_BUG_02
+  // Test Case ID: TC_CRT_15
   // BUG: getCertificate() returns hardcoded `revoked: false` instead of
   // querying the actual revocation status from the smart contract.
   // Source: blockchain.service.ts line 242

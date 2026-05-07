@@ -40,7 +40,7 @@ describe('PinataService', () => {
   // uploadFile
   // ────────────────────────────────────────────────────────────────────────
 
-  // Test Case ID: TC_PINATA_01
+  // Test Case ID: TC_CRT_16
   it('should_UploadFile_When_ValidBuffer', async () => {
     const expectedHash = 'QmTestFileHash123';
     mockPost.mockResolvedValue({
@@ -60,7 +60,7 @@ describe('PinataService', () => {
     );
   });
 
-  // Test Case ID: TC_PINATA_02
+  // Test Case ID: TC_CRT_17
   it('should_ThrowError_When_UploadFileWithNoCredentials', async () => {
     const moduleNoCreds: TestingModule = await Test.createTestingModule({
       providers: [
@@ -80,7 +80,7 @@ describe('PinataService', () => {
     ).rejects.toThrow('Pinata API credentials not configured');
   });
 
-  // Test Case ID: TC_PINATA_03
+  // Test Case ID: TC_CRT_18
   it('should_ThrowError_When_UploadFileApiFails', async () => {
     mockPost.mockRejectedValue(new Error('Network error'));
 
@@ -94,7 +94,7 @@ describe('PinataService', () => {
   // uploadJSON
   // ────────────────────────────────────────────────────────────────────────
 
-  // Test Case ID: TC_PINATA_04
+  // Test Case ID: TC_CRT_19
   it('should_UploadJSON_When_ValidMetadata', async () => {
     const expectedHash = 'QmTestJsonHash456';
     mockPost.mockResolvedValue({
@@ -114,7 +114,7 @@ describe('PinataService', () => {
     );
   });
 
-  // Test Case ID: TC_PINATA_05
+  // Test Case ID: TC_CRT_20
   it('should_ThrowError_When_UploadJSONWithNoCredentials', async () => {
     const moduleNoCreds: TestingModule = await Test.createTestingModule({
       providers: [
@@ -133,7 +133,7 @@ describe('PinataService', () => {
     ).rejects.toThrow('Pinata API credentials not configured');
   });
 
-  // Test Case ID: TC_PINATA_06
+  // Test Case ID: TC_CRT_21
   it('should_ThrowError_When_UploadJSONApiFails', async () => {
     mockPost.mockRejectedValue(new Error('Server error'));
 
@@ -142,7 +142,7 @@ describe('PinataService', () => {
     );
   });
 
-  // Test Case ID: TC_PINATA_07
+  // Test Case ID: TC_CRT_22
   it('should_UseDefaultName_When_UploadJSONWithoutName', async () => {
     mockPost.mockResolvedValue({
       data: { IpfsHash: 'QmDefault', PinSize: 128, Timestamp: '2025-01-01' },
@@ -162,7 +162,7 @@ describe('PinataService', () => {
   // getGatewayUrl
   // ────────────────────────────────────────────────────────────────────────
 
-  // Test Case ID: TC_PINATA_08
+  // Test Case ID: TC_CRT_23
   it('should_ReturnGatewayUrl_When_ValidIpfsHash', () => {
     const url = service.getGatewayUrl('QmTestHash');
     expect(url).toBe('https://gateway.test.pinata.cloud/ipfs/QmTestHash');

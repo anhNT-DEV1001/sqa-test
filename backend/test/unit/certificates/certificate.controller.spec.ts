@@ -51,7 +51,7 @@ describe('CertificateController', () => {
   // issue()
   // ────────────────────────────────────────────────────────────────────────
 
-  // Test Case ID: TC_CERTCTRL_01
+  // Test Case ID: TC_CRT_65
   it('should_IssueCertificate_When_ValidDto', async () => {
     mockCertificateService.issue.mockResolvedValue(mockCertData);
 
@@ -69,7 +69,7 @@ describe('CertificateController', () => {
   // list()
   // ────────────────────────────────────────────────────────────────────────
 
-  // Test Case ID: TC_CERTCTRL_02
+  // Test Case ID: TC_CRT_66
   it('should_ListCertificates_When_AdminUser', async () => {
     mockCertificateService.list.mockResolvedValue(mockListResult);
     const adminUser = { id: 'admin1', role: 'admin' } as IUser;
@@ -83,7 +83,7 @@ describe('CertificateController', () => {
     );
   });
 
-  // Test Case ID: TC_CERTCTRL_03
+  // Test Case ID: TC_CRT_67
   it('should_OverrideStudentId_When_StudentUser', async () => {
     mockCertificateService.list.mockResolvedValue(mockListResult);
     const studentUser = { id: 'student1', role: 'student' } as IUser;
@@ -95,7 +95,7 @@ describe('CertificateController', () => {
     );
   });
 
-  // Test Case ID: TC_CERTCTRL_04
+  // Test Case ID: TC_CRT_68
   it('should_OverrideTeacherId_When_TeacherUser', async () => {
     mockCertificateService.list.mockResolvedValue(mockListResult);
     const teacherUser = { id: 'teacher1', role: 'teacher' } as IUser;
@@ -111,7 +111,7 @@ describe('CertificateController', () => {
   // getById()
   // ────────────────────────────────────────────────────────────────────────
 
-  // Test Case ID: TC_CERTCTRL_05
+  // Test Case ID: TC_CRT_69
   it('should_GetById_When_ValidId', async () => {
     mockCertificateService.getById.mockResolvedValue(mockCertData);
 
@@ -126,7 +126,7 @@ describe('CertificateController', () => {
   // getByStudent()
   // ────────────────────────────────────────────────────────────────────────
 
-  // Test Case ID: TC_CERTCTRL_06
+  // Test Case ID: TC_CRT_70
   it('should_GetByStudent_When_ValidStudentId', async () => {
     mockCertificateService.getByStudent.mockResolvedValue(mockListResult);
 
@@ -143,7 +143,7 @@ describe('CertificateController', () => {
   // getByCourse()
   // ────────────────────────────────────────────────────────────────────────
 
-  // Test Case ID: TC_CERTCTRL_07
+  // Test Case ID: TC_CRT_71
   it('should_GetByCourse_When_ValidCourseId', async () => {
     mockCertificateService.getByCourse.mockResolvedValue(mockListResult);
 
@@ -160,7 +160,7 @@ describe('CertificateController', () => {
   // revoke()
   // ────────────────────────────────────────────────────────────────────────
 
-  // Test Case ID: TC_CERTCTRL_08
+  // Test Case ID: TC_CRT_72
   it('should_RevokeCertificate_When_ValidId', async () => {
     const revokedCert = { ...mockCertData, status: 'revoked' };
     mockCertificateService.revoke.mockResolvedValue(revokedCert);
@@ -178,7 +178,7 @@ describe('CertificateController', () => {
     );
   });
 
-  // Test Case ID: TC_CERTCTRL_09
+  // Test Case ID: TC_CRT_73
   it('should_RevokeCertificate_WithTransactionHash', async () => {
     const revokedCert = { ...mockCertData, status: 'revoked' };
     mockCertificateService.revoke.mockResolvedValue(revokedCert);
@@ -199,7 +199,7 @@ describe('CertificateController', () => {
   // generateCertificate()
   // ────────────────────────────────────────────────────────────────────────
 
-  // Test Case ID: TC_CERTCTRL_10
+  // Test Case ID: TC_CRT_74
   it('should_GenerateCertificate_When_ValidId', async () => {
     const genResult = {
       imageIpfsHash: 'QmImage',

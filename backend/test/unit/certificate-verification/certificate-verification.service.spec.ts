@@ -78,14 +78,14 @@ describe('CertificateVerificationService', () => {
   // verifyByCertificateId()
   // ────────────────────────────────────────────────────────────────────────
 
-  // Test Case ID: TC_VERIFY_01
+  // Test Case ID: TC_CRT_75
   it('should_ThrowBadRequest_When_InvalidCertificateId', async () => {
     await expect(
       service.verifyByCertificateId('invalid-id'),
     ).rejects.toThrow(BadRequestException);
   });
 
-  // Test Case ID: TC_VERIFY_02
+  // Test Case ID: TC_CRT_76
   it('should_ReturnInvalid_When_CertificateNotFound', async () => {
     setupFindById(null);
 
@@ -96,7 +96,7 @@ describe('CertificateVerificationService', () => {
     expect(result.certificate).toBeNull();
   });
 
-  // Test Case ID: TC_VERIFY_03
+  // Test Case ID: TC_CRT_77
   it('should_ReturnValid_When_IssuedCertificateFound', async () => {
     setupFindById(populatedCert);
     mockBlockchainService.verifyCertificate.mockResolvedValue({
@@ -112,7 +112,7 @@ describe('CertificateVerificationService', () => {
     expect(result.blockchainVerification).toBeDefined();
   });
 
-  // Test Case ID: TC_VERIFY_04
+  // Test Case ID: TC_CRT_78
   it('should_ReturnInvalid_When_CertificateIsRevoked', async () => {
     const revokedCert = { ...populatedCert, status: 'revoked' };
     setupFindById(revokedCert);
@@ -127,7 +127,7 @@ describe('CertificateVerificationService', () => {
     expect(result.message).toBe('Certificate has been revoked');
   });
 
-  // Test Case ID: TC_VERIFY_05
+  // Test Case ID: TC_CRT_79
   it('should_ReturnPending_When_CertificateIsPending', async () => {
     const pendingCert = { ...populatedCert, status: 'pending', tokenId: undefined };
     setupFindById(pendingCert);
@@ -138,7 +138,7 @@ describe('CertificateVerificationService', () => {
     expect(result.message).toBe('Certificate is pending issuance');
   });
 
-  // Test Case ID: TC_VERIFY_06
+  // Test Case ID: TC_CRT_80
   it('should_HandleBlockchainVerifyFailure_Gracefully', async () => {
     setupFindById(populatedCert);
     mockBlockchainService.verifyCertificate.mockRejectedValue(
@@ -156,17 +156,17 @@ describe('CertificateVerificationService', () => {
   // verifyByTokenId()
   // ────────────────────────────────────────────────────────────────────────
 
-  // Test Case ID: TC_VERIFY_07
+  // Test Case ID: TC_CRT_81
   it('should_ThrowBadRequest_When_EmptyTokenId', async () => {
     await expect(service.verifyByTokenId('')).rejects.toThrow(BadRequestException);
   });
 
-  // Test Case ID: TC_VERIFY_08
+  // Test Case ID: TC_CRT_82
   it('should_ThrowBadRequest_When_WhitespaceTokenId', async () => {
     await expect(service.verifyByTokenId('   ')).rejects.toThrow(BadRequestException);
   });
 
-  // Test Case ID: TC_VERIFY_09
+  // Test Case ID: TC_CRT_83
   it('should_ReturnInvalid_When_TokenNotOnBlockchain', async () => {
     mockBlockchainService.verifyCertificate.mockResolvedValue({
       valid: false,
@@ -179,7 +179,7 @@ describe('CertificateVerificationService', () => {
     expect(result.message).toBe('Certificate not found on blockchain');
   });
 
-  // Test Case ID: TC_VERIFY_10
+  // Test Case ID: TC_CRT_84
   it('should_ReturnValidWithBlockchainOnly_When_NoLocalRecord', async () => {
     mockBlockchainService.verifyCertificate.mockResolvedValue({
       valid: true,
@@ -195,7 +195,7 @@ describe('CertificateVerificationService', () => {
     expect(result.blockchainVerification?.valid).toBe(true);
   });
 
-  // Test Case ID: TC_VERIFY_11
+  // Test Case ID: TC_CRT_85
   it('should_ReturnFullVerification_When_TokenFoundOnBothSides', async () => {
     mockBlockchainService.verifyCertificate.mockResolvedValue({
       valid: true,
@@ -214,12 +214,12 @@ describe('CertificateVerificationService', () => {
   // lookupCertificates()
   // ────────────────────────────────────────────────────────────────────────
 
-  // Test Case ID: TC_VERIFY_12
+  // Test Case ID: TC_CRT_86
   it('should_ThrowBadRequest_When_NoFiltersProvided', async () => {
     await expect(service.lookupCertificates({})).rejects.toThrow(BadRequestException);
   });
 
-  // Test Case ID: TC_VERIFY_13
+  // Test Case ID: TC_CRT_87
   it('should_LookupByCertificateId_When_ValidId', async () => {
     mockCertificateModel.find.mockReturnValue({
       populate: jest.fn().mockReturnThis(),
@@ -235,14 +235,14 @@ describe('CertificateVerificationService', () => {
     expect(results[0].id).toBe(String(validCertId));
   });
 
-  // Test Case ID: TC_VERIFY_14
+  // Test Case ID: TC_CRT_88
   it('should_ThrowBadRequest_When_InvalidCertificateIdFormat', async () => {
     await expect(
       service.lookupCertificates({ certificateId: 'bad-format' }),
     ).rejects.toThrow(BadRequestException);
   });
 
-  // Test Case ID: TC_VERIFY_15
+  // Test Case ID: TC_CRT_89
   it('should_LookupByTokenId_When_Provided', async () => {
     mockCertificateModel.find.mockReturnValue({
       populate: jest.fn().mockReturnThis(),
@@ -255,7 +255,7 @@ describe('CertificateVerificationService', () => {
     expect(results).toHaveLength(1);
   });
 
-  // Test Case ID: TC_VERIFY_16
+  // Test Case ID: TC_CRT_90
   it('should_LookupByStudentEmail_When_StudentExists', async () => {
     mockUserModel.findOne.mockReturnValue({
       select: jest.fn().mockReturnThis(),
@@ -272,7 +272,7 @@ describe('CertificateVerificationService', () => {
     expect(results).toHaveLength(1);
   });
 
-  // Test Case ID: TC_VERIFY_17
+  // Test Case ID: TC_CRT_91
   it('should_ReturnEmpty_When_StudentEmailNotFound', async () => {
     mockUserModel.findOne.mockReturnValue({
       select: jest.fn().mockReturnThis(),

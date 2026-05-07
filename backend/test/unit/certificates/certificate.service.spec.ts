@@ -129,7 +129,7 @@ describe('CertificateService', () => {
   // issue()
   // ────────────────────────────────────────────────────────────────────────
 
-  // Test Case ID: TC_CERT_01
+  // Test Case ID: TC_CRT_38
   it('should_IssueCertificate_When_ValidSubmission', async () => {
     setupIssueHappyPath();
 
@@ -154,7 +154,7 @@ describe('CertificateService', () => {
     );
   });
 
-  // Test Case ID: TC_CERT_02
+  // Test Case ID: TC_CRT_39
   it('should_ReturnExistingCertificate_When_DuplicateSubmission', async () => {
     mockSubmissionModel.findOne.mockResolvedValue(mockSubmission);
     mockCertificateModel.findOne.mockResolvedValue({ _id: certificateId });
@@ -172,7 +172,7 @@ describe('CertificateService', () => {
     expect(mockBlockchainService.issueCertificate).not.toHaveBeenCalled();
   });
 
-  // Test Case ID: TC_CERT_03
+  // Test Case ID: TC_CRT_40
   it('should_ThrowNotFound_When_SubmissionNotFound', async () => {
     mockSubmissionModel.findOne.mockResolvedValue(null);
 
@@ -181,7 +181,7 @@ describe('CertificateService', () => {
     ).rejects.toThrow(NotFoundException);
   });
 
-  // Test Case ID: TC_CERT_04
+  // Test Case ID: TC_CRT_41
   it('should_ThrowNotFound_When_ExamNotFound', async () => {
     mockSubmissionModel.findOne.mockResolvedValue(mockSubmission);
     mockCertificateModel.findOne.mockResolvedValue(null);
@@ -192,7 +192,7 @@ describe('CertificateService', () => {
     ).rejects.toThrow(NotFoundException);
   });
 
-  // Test Case ID: TC_CERT_05
+  // Test Case ID: TC_CRT_42
   it('should_ThrowNotFound_When_CourseNotFound', async () => {
     mockSubmissionModel.findOne.mockResolvedValue(mockSubmission);
     mockCertificateModel.findOne.mockResolvedValue(null);
@@ -204,7 +204,7 @@ describe('CertificateService', () => {
     ).rejects.toThrow(NotFoundException);
   });
 
-  // Test Case ID: TC_CERT_06
+  // Test Case ID: TC_CRT_43
   it('should_ThrowNotFound_When_StudentNotFound', async () => {
     mockSubmissionModel.findOne.mockResolvedValue(mockSubmission);
     mockCertificateModel.findOne.mockResolvedValue(null);
@@ -217,7 +217,7 @@ describe('CertificateService', () => {
     ).rejects.toThrow(NotFoundException);
   });
 
-  // Test Case ID: TC_CERT_07
+  // Test Case ID: TC_CRT_44
   it('should_UsePlaceholderIpfs_When_PinataUploadFails', async () => {
     setupIssueHappyPath();
     mockCertGenService.generateAndUploadCertificate.mockRejectedValue(
@@ -233,7 +233,7 @@ describe('CertificateService', () => {
     expect(mockSavedCertificate.save).toHaveBeenCalled();
   });
 
-  // Test Case ID: TC_CERT_08
+  // Test Case ID: TC_CRT_45
   it('should_HandleBlockchainMintFailure_Gracefully', async () => {
     setupIssueHappyPath();
     mockBlockchainService.issueCertificate.mockRejectedValue(
@@ -248,7 +248,7 @@ describe('CertificateService', () => {
     expect(result).toBeDefined();
   });
 
-  // Test Case ID: TC_CERT_09
+  // Test Case ID: TC_CRT_46
   it('should_HandleBigIntSerializeError_WithoutCrashing', async () => {
     setupIssueHappyPath();
     mockBlockchainService.issueCertificate.mockRejectedValue(
@@ -263,7 +263,7 @@ describe('CertificateService', () => {
     expect(result).toBeDefined();
   });
 
-  // Test Case ID: TC_CERT_10
+  // Test Case ID: TC_CRT_47
   it('should_UseDefaultRecipient_When_StudentHasNoWallet', async () => {
     setupIssueHappyPath();
     const studentNoWallet = { ...mockStudent, walletAddress: undefined };
@@ -281,7 +281,7 @@ describe('CertificateService', () => {
     );
   });
 
-  // Test Case ID: TC_CERT_11
+  // Test Case ID: TC_CRT_48
   it('should_DispatchNotification_When_IssuingSucceeds', async () => {
     setupIssueHappyPath();
 
@@ -298,7 +298,7 @@ describe('CertificateService', () => {
     );
   });
 
-  // Test Case ID: TC_CERT_12
+  // Test Case ID: TC_CRT_49
   it('should_NotCrash_When_NotificationFails', async () => {
     setupIssueHappyPath();
     mockNotificationsService.createNotification.mockRejectedValue(
@@ -328,7 +328,7 @@ describe('CertificateService', () => {
     mockCertificateModel.countDocuments.mockResolvedValue(total);
   }
 
-  // Test Case ID: TC_CERT_13
+  // Test Case ID: TC_CRT_50
   it('should_ListCertificates_When_NoFilters', async () => {
     setupListMock([mockPopulatedCert], 1);
 
@@ -339,7 +339,7 @@ describe('CertificateService', () => {
     expect(result.page).toBe(1);
   });
 
-  // Test Case ID: TC_CERT_14
+  // Test Case ID: TC_CRT_51
   it('should_FilterByStatus_When_StatusProvided', async () => {
     setupListMock([], 0);
 
@@ -349,7 +349,7 @@ describe('CertificateService', () => {
     expect(mockCertificateModel.find).toHaveBeenCalled();
   });
 
-  // Test Case ID: TC_CERT_15
+  // Test Case ID: TC_CRT_52
   it('should_FilterByDateRange_When_IssuedFromAndToProvided', async () => {
     setupListMock([], 0);
 
@@ -363,7 +363,7 @@ describe('CertificateService', () => {
     expect(mockCertificateModel.find).toHaveBeenCalled();
   });
 
-  // Test Case ID: TC_CERT_16
+  // Test Case ID: TC_CRT_53
   it('should_FilterByCourseName_When_CourseNameProvided', async () => {
     mockCourseModel.find.mockReturnValue({
       select: jest.fn().mockReturnThis(),
@@ -379,7 +379,7 @@ describe('CertificateService', () => {
     expect(result).toBeDefined();
   });
 
-  // Test Case ID: TC_CERT_17
+  // Test Case ID: TC_CRT_54
   it('should_FilterByTeacherId_When_TeacherIdProvided', async () => {
     const teacherId = new Types.ObjectId();
     mockCourseModel.find.mockReturnValue({
@@ -397,7 +397,7 @@ describe('CertificateService', () => {
     expect(result).toBeDefined();
   });
 
-  // Test Case ID: TC_CERT_18
+  // Test Case ID: TC_CRT_55
   it('should_ReturnEmpty_When_CourseNameMatchesNothing', async () => {
     mockCourseModel.find.mockReturnValue({
       select: jest.fn().mockReturnThis(),
@@ -418,7 +418,7 @@ describe('CertificateService', () => {
   // getById()
   // ────────────────────────────────────────────────────────────────────────
 
-  // Test Case ID: TC_CERT_19
+  // Test Case ID: TC_CRT_56
   it('should_GetCertificate_When_ValidId', async () => {
     mockCertificateModel.findById.mockReturnValue({
       populate: jest.fn().mockReturnThis(),
@@ -431,7 +431,7 @@ describe('CertificateService', () => {
     expect(result._id).toEqual(certificateId);
   });
 
-  // Test Case ID: TC_CERT_20
+  // Test Case ID: TC_CRT_57
   it('should_ThrowNotFound_When_CertificateIdInvalid', async () => {
     mockCertificateModel.findById.mockReturnValue({
       populate: jest.fn().mockReturnThis(),
@@ -445,7 +445,7 @@ describe('CertificateService', () => {
   // getByStudent() / getByCourse()
   // ────────────────────────────────────────────────────────────────────────
 
-  // Test Case ID: TC_CERT_21
+  // Test Case ID: TC_CRT_58
   it('should_GetByStudent_DelegatingToList', async () => {
     setupListMock([mockPopulatedCert], 1);
 
@@ -454,7 +454,7 @@ describe('CertificateService', () => {
     expect(result.items).toHaveLength(1);
   });
 
-  // Test Case ID: TC_CERT_22
+  // Test Case ID: TC_CRT_59
   it('should_GetByCourse_DelegatingToList', async () => {
     setupListMock([mockPopulatedCert], 1);
 
@@ -467,7 +467,7 @@ describe('CertificateService', () => {
   // revoke()
   // ────────────────────────────────────────────────────────────────────────
 
-  // Test Case ID: TC_CERT_23
+  // Test Case ID: TC_CRT_60
   it('should_RevokeCertificate_When_ValidId', async () => {
     const mockCert = { _id: certificateId, status: 'issued', save: jest.fn() };
     mockCert.save.mockResolvedValue(mockCert);
@@ -484,7 +484,7 @@ describe('CertificateService', () => {
     expect(mockCert.save).toHaveBeenCalled();
   });
 
-  // Test Case ID: TC_CERT_24
+  // Test Case ID: TC_CRT_61
   it('should_RevokeCertificate_WithTransactionHash', async () => {
     const mockCert = {
       _id: certificateId,
@@ -505,7 +505,7 @@ describe('CertificateService', () => {
     expect(mockCert.transactionHash).toBe('0xrevoke_tx');
   });
 
-  // Test Case ID: TC_CERT_25
+  // Test Case ID: TC_CRT_62
   it('should_ThrowNotFound_When_RevokeNonexistentCert', async () => {
     mockCertificateModel.findById.mockResolvedValue(null);
 
@@ -519,7 +519,7 @@ describe('CertificateService', () => {
   // exposing real bugs in the source code.
   // ════════════════════════════════════════════════════════════════════════
 
-  // Test Case ID: TC_CERT_BUG_01
+  // Test Case ID: TC_CRT_63
   // BUG: revoke() receives `reason` parameter but NEVER persists it.
   // Source: certificate.service.ts line 362 — comment says
   // "reason can be stored later if we add a field"
@@ -546,7 +546,7 @@ describe('CertificateService', () => {
     expect(mockCert.reason).toBe('Academic fraud');
   });
 
-  // Test Case ID: TC_CERT_BUG_02
+  // Test Case ID: TC_CRT_64
   // BUG: list() uses `new RegExp(courseName, 'i')` with raw user input.
   // Source: certificate.service.ts line 272
   // Impact: Special regex characters like ( [ * + crash the app with

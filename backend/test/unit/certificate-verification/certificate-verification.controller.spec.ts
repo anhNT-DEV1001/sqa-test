@@ -51,7 +51,7 @@ describe('CertificateVerificationController', () => {
   // verifyByCertificateId()
   // ────────────────────────────────────────────────────────────────────────
 
-  // Test Case ID: TC_VERIFYCTRL_01
+  // Test Case ID: TC_CRT_92
   it('should_VerifyByCertificateId_When_ValidId', async () => {
     mockVerificationService.verifyByCertificateId.mockResolvedValue(
       mockVerificationResult,
@@ -69,7 +69,7 @@ describe('CertificateVerificationController', () => {
     );
   });
 
-  // Test Case ID: TC_VERIFYCTRL_02
+  // Test Case ID: TC_CRT_93
   it('should_ReturnInvalidResult_When_CertificateNotFound', async () => {
     const notFoundResult = {
       valid: false,
@@ -89,7 +89,7 @@ describe('CertificateVerificationController', () => {
   // verifyByTokenId()
   // ────────────────────────────────────────────────────────────────────────
 
-  // Test Case ID: TC_VERIFYCTRL_03
+  // Test Case ID: TC_CRT_94
   it('should_VerifyByTokenId_When_ValidToken', async () => {
     mockVerificationService.verifyByTokenId.mockResolvedValue(
       mockVerificationResult,
@@ -102,7 +102,7 @@ describe('CertificateVerificationController', () => {
     expect(mockVerificationService.verifyByTokenId).toHaveBeenCalledWith('token-1');
   });
 
-  // Test Case ID: TC_VERIFYCTRL_04
+  // Test Case ID: TC_CRT_95
   it('should_ReturnInvalid_When_TokenNotOnBlockchain', async () => {
     const invalidResult = {
       valid: false,
@@ -121,7 +121,7 @@ describe('CertificateVerificationController', () => {
   // lookupCertificates()
   // ────────────────────────────────────────────────────────────────────────
 
-  // Test Case ID: TC_VERIFYCTRL_05
+  // Test Case ID: TC_CRT_96
   it('should_LookupCertificates_When_FiltersProvided', async () => {
     const lookupItems = [
       { id: '507f1f77bcf86cd799439011', status: 'issued', tokenId: 'token-1' },
@@ -144,7 +144,7 @@ describe('CertificateVerificationController', () => {
     });
   });
 
-  // Test Case ID: TC_VERIFYCTRL_06
+  // Test Case ID: TC_CRT_97
   it('should_LookupByEmail_When_EmailProvided', async () => {
     mockVerificationService.lookupCertificates.mockResolvedValue([]);
 

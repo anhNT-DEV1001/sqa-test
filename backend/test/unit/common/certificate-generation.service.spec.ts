@@ -88,7 +88,7 @@ describe('CertificateGenerationService', () => {
   // generateAndUploadCertificate – happy path
   // ────────────────────────────────────────────────────────────────────────
 
-  // Test Case ID: TC_CERTGEN_01
+  // Test Case ID: TC_CRT_30
   it('should_GenerateAndUpload_When_ValidCertificateId', async () => {
     mockCertificateModel.findById.mockReturnValue({
       populate: jest.fn().mockReturnThis(),
@@ -123,7 +123,7 @@ describe('CertificateGenerationService', () => {
     expect(mockPinataService.uploadJSON).toHaveBeenCalled();
   });
 
-  // Test Case ID: TC_CERTGEN_02
+  // Test Case ID: TC_CRT_31
   it('should_UseUsername_When_FullNameMissing', async () => {
     const studentNoFullName = { ...mockStudent, fullName: undefined };
     const certNoFullName = {
@@ -152,7 +152,7 @@ describe('CertificateGenerationService', () => {
   // generateAndUploadCertificate – error cases
   // ────────────────────────────────────────────────────────────────────────
 
-  // Test Case ID: TC_CERTGEN_03
+  // Test Case ID: TC_CRT_32
   it('should_ThrowNotFound_When_CertificateNotFound', async () => {
     mockCertificateModel.findById.mockReturnValue({
       populate: jest.fn().mockReturnThis(),
@@ -164,7 +164,7 @@ describe('CertificateGenerationService', () => {
     ).rejects.toThrow(NotFoundException);
   });
 
-  // Test Case ID: TC_CERTGEN_04
+  // Test Case ID: TC_CRT_33
   it('should_ThrowNotFound_When_CertificateDataIncomplete_NoStudent', async () => {
     const incompleteCert = { ...mockCertificate, studentId: null };
 
@@ -178,7 +178,7 @@ describe('CertificateGenerationService', () => {
     ).rejects.toThrow(NotFoundException);
   });
 
-  // Test Case ID: TC_CERTGEN_05
+  // Test Case ID: TC_CRT_34
   it('should_ThrowNotFound_When_CertificateDataIncomplete_NoCourse', async () => {
     const incompleteCert = { ...mockCertificate, courseId: null };
 
@@ -192,7 +192,7 @@ describe('CertificateGenerationService', () => {
     ).rejects.toThrow(NotFoundException);
   });
 
-  // Test Case ID: TC_CERTGEN_06
+  // Test Case ID: TC_CRT_35
   it('should_ThrowNotFound_When_ExamNotFound', async () => {
     mockCertificateModel.findById.mockReturnValue({
       populate: jest.fn().mockReturnThis(),
@@ -207,7 +207,7 @@ describe('CertificateGenerationService', () => {
     ).rejects.toThrow(NotFoundException);
   });
 
-  // Test Case ID: TC_CERTGEN_07
+  // Test Case ID: TC_CRT_36
   it('should_ThrowError_When_ImageGenerationFails', async () => {
     mockCertificateModel.findById.mockReturnValue({
       populate: jest.fn().mockReturnThis(),
@@ -225,7 +225,7 @@ describe('CertificateGenerationService', () => {
     ).rejects.toThrow('Canvas render failed');
   });
 
-  // Test Case ID: TC_CERTGEN_08
+  // Test Case ID: TC_CRT_37
   it('should_ThrowError_When_PinataUploadFails', async () => {
     mockCertificateModel.findById.mockReturnValue({
       populate: jest.fn().mockReturnThis(),

@@ -49,7 +49,7 @@ Generate a structured report encompassing the following sections:
 ### DELIVERABLE 2: UNIT TEST SCRIPTS
 When generating the actual test code, you MUST adhere strictly to these rules:
 1. **Detailed Comments:** Every block of logic must be explained clearly.
-2. **Test Case ID Mapping:** Above every single test function, include a comment mapping it exactly to the report: `// Test Case ID: TC_USER_01`.
+2. **Test Case ID Mapping:** Above every single test function, include a comment mapping it exactly to the report (e.g. `// Test Case ID: TC_USER_01`; Certificate Management suite uses `// Test Case ID: TC_CRT_01` … sequentially per `UNIT-TEST-REPORT-CERTIFICATE.md`).
 3. **Naming Conventions:** Use highly descriptive names for variables, mocks, and functions (e.g., `should_IssueNFTCertificate_When_StudentPassesExam`).
 4. **CheckDB Requirement:** For operations that mutate state (e.g., creating a course, updating a user, saving an exam result), the test *must* include an assertion that queries the test database or mock repository to verify the data was correctly written/updated according to requirements.
 5. **Rollback/Teardown Requirement:** Tests interacting with a database MUST ensure state isolation. Implement transaction rollbacks (`BEGIN`...`ROLLBACK`, or framework equivalents like Laravel's `RefreshDatabase`, or Jest's `afterEach` DB cleanup) so the DB returns to its exact original state AFTER the test.

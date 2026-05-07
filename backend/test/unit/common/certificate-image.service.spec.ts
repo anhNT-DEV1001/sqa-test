@@ -86,7 +86,7 @@ describe('CertificateImageService', () => {
     service = module.get<CertificateImageService>(CertificateImageService);
   });
 
-  // Test Case ID: TC_IMG_01
+  // Test Case ID: TC_CRT_24
   it('should_GenerateImage_When_FullDataProvided', async () => {
     const result = await service.generateCertificateImage(baseCertData);
 
@@ -95,7 +95,7 @@ describe('CertificateImageService', () => {
     expect(mockFillText).toHaveBeenCalled();
   });
 
-  // Test Case ID: TC_IMG_02
+  // Test Case ID: TC_CRT_25
   it('should_GenerateImage_When_OptionalFieldsMissing', async () => {
     const minimalData: CertificateData = {
       studentName: 'Tran B',
@@ -110,7 +110,7 @@ describe('CertificateImageService', () => {
     expect(result).toBeInstanceOf(Buffer);
   });
 
-  // Test Case ID: TC_IMG_03
+  // Test Case ID: TC_CRT_26
   it('should_GenerateImage_WithStudentImage_When_UrlProvided', async () => {
     const dataWithImage: CertificateData = {
       ...baseCertData,
@@ -124,7 +124,7 @@ describe('CertificateImageService', () => {
     expect(loadImage).toHaveBeenCalledWith('https://example.com/photo.jpg');
   });
 
-  // Test Case ID: TC_IMG_04
+  // Test Case ID: TC_CRT_27
   it('should_SkipStudentImage_When_UrlNotProvided', async () => {
     await service.generateCertificateImage(baseCertData);
 
@@ -132,7 +132,7 @@ describe('CertificateImageService', () => {
     expect(loadImage).not.toHaveBeenCalled();
   });
 
-  // Test Case ID: TC_IMG_05
+  // Test Case ID: TC_CRT_28
   it('should_ContinueWithoutImage_When_ImageLoadFails', async () => {
     const { loadImage } = require('canvas');
     loadImage.mockRejectedValueOnce(new Error('Image load failed'));
@@ -148,7 +148,7 @@ describe('CertificateImageService', () => {
     expect(result).toBeInstanceOf(Buffer);
   });
 
-  // Test Case ID: TC_IMG_06
+  // Test Case ID: TC_CRT_29
   it('should_IncludeIdentifyNumberAndExpireDate_When_Provided', async () => {
     const dataWithExtras: CertificateData = {
       ...baseCertData,
