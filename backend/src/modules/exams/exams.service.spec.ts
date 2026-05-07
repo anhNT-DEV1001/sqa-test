@@ -28,7 +28,7 @@ describe('ExamsService - Instructor Exam Management', () => {
     deleteOne: jest.fn(),
     countDocuments: jest.fn(),
     hydrate: jest.fn(),
-    findById: jest.fn()
+    findById: jest.fn(),
   };
 
   const mockCourseModel = {
@@ -39,33 +39,56 @@ describe('ExamsService - Instructor Exam Management', () => {
   const mockQuestionModel = {
     insertMany: jest.fn(),
     deleteMany: jest.fn(),
-    find: jest.fn()
+    find: jest.fn(),
   };
 
   const mockSubmissionModel = {
     findOne: jest.fn(),
     deleteMany: jest.fn(),
-    create: jest.fn()
+    create: jest.fn(),
   };
 
   const mockUserModel = {
-    findById: jest.fn()
+    findById: jest.fn(),
   };
 
   const mockNotificationsService = {
-    createNotification: jest.fn()
+    createNotification: jest.fn(),
   };
 
   const mockSession = {
     startTransaction: jest.fn(),
     commitTransaction: jest.fn(),
     abortTransaction: jest.fn(),
-    endSession: jest.fn()
+    endSession: jest.fn(),
   };
 
   const mockConnection = {
-    startSession: jest.fn().mockResolvedValue(mockSession)
+    startSession: jest.fn().mockResolvedValue(mockSession),
   };
+
+  // Helper to build a valid createExam DTO
+  const buildValidExamDto = (overrides: any = {}) => ({
+    title: 'Midterm Exam',
+    durationMinutes: 60,
+    startTime: new Date(Date.now() + 3600000).toISOString(),
+    endTime: new Date(Date.now() + 86400000).toISOString(),
+    courseId: mockCourseId.toHexString(),
+    questions: [{
+      content: 'What is 2+2?',
+      answerQuestion: 1,
+      answer: [
+        { content: '3' },
+        { content: '4' },
+        { content: '5' },
+        { content: '6' },
+      ],
+    }],
+    rateScore: 50,
+    ...overrides,
+  });
+
+  const mockTeacherUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -87,2530 +110,1133 @@ describe('ExamsService - Instructor Exam Management', () => {
     service = module.get<ExamsService>(ExamsService);
   });
 
+  // ============================================================
+  // createExam Method Tests
+  // ============================================================
 
-  // TC_createExam_001
+  // TC_CREATE_EXAM_001
   // Method: createExam
-  // Purpose: To create exam with duration 5 min
-  // Input: { title: "T", durationMinutes: 5, ... }
-  // Expected output: Exam object with matching duration
+  // Purpose: Verify successful exam creation with valid input data
+  // Input: Valid CreateExamDto with title "Midterm Exam", durationMinutes 60, valid courseId, 1 question
+  // Expected output: Exam object with matching title and durationMinutes
   // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_001', async () => {
+  // checkdb: Verifies courseModel.findById, questionModel.insertMany, examModel.create called with session
+  // rollback: jest.clearAllMocks() in beforeEach; transaction session mocked with commit/abort
+  it('TC_CREATE_EXAM_001', async () => {
     mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
+    const mockQ = { _id: new Types.ObjectId(), content: 'What is 2+2?', answerQuestion: 1, answer: [{ content: '3' }, { content: '4' }, { content: '5' }, { content: '6' }] };
     mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 5, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
+    const mockExam = {
+      _id: mockExamId, publicId: 'E-123456', title: 'Midterm Exam',
+      startTime: new Date(), endTime: new Date(Date.now() + 86400000),
+      durationMinutes: 60, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date(),
+    };
     mockExamModel.create.mockResolvedValue([mockExam]);
 
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 5, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
+    const result = await service.createExam(buildValidExamDto() as any, mockTeacherUser as any);
 
-    expect(res.durationMinutes).toBe(5);
+    expect(result.title).toBe('Midterm Exam');
+    expect(result.durationMinutes).toBe(60);
+    expect(mockSession.commitTransaction).toHaveBeenCalled();
+    expect(mockSession.endSession).toHaveBeenCalled();
   });
 
-  // TC_createExam_002
+  // TC_CREATE_EXAM_002
   // Method: createExam
-  // Purpose: To create exam with duration 10 min
-  // Input: { title: "T", durationMinutes: 10, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_002', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 10, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 10, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(10);
-  });
-
-  // TC_createExam_003
-  // Method: createExam
-  // Purpose: To create exam with duration 15 min
-  // Input: { title: "T", durationMinutes: 15, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_003', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 15, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 15, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(15);
-  });
-
-  // TC_createExam_004
-  // Method: createExam
-  // Purpose: To create exam with duration 20 min
-  // Input: { title: "T", durationMinutes: 20, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_004', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 20, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 20, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(20);
-  });
-
-  // TC_createExam_005
-  // Method: createExam
-  // Purpose: To create exam with duration 25 min
-  // Input: { title: "T", durationMinutes: 25, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_005', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 25, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 25, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(25);
-  });
-
-  // TC_createExam_006
-  // Method: createExam
-  // Purpose: To create exam with duration 30 min
-  // Input: { title: "T", durationMinutes: 30, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_006', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 30, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 30, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(30);
-  });
-
-  // TC_createExam_007
-  // Method: createExam
-  // Purpose: To create exam with duration 35 min
-  // Input: { title: "T", durationMinutes: 35, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_007', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 35, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 35, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(35);
-  });
-
-  // TC_createExam_008
-  // Method: createExam
-  // Purpose: To create exam with duration 40 min
-  // Input: { title: "T", durationMinutes: 40, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_008', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 40, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 40, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(40);
-  });
-
-  // TC_createExam_009
-  // Method: createExam
-  // Purpose: To create exam with duration 45 min
-  // Input: { title: "T", durationMinutes: 45, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_009', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 45, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 45, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(45);
-  });
-
-  // TC_createExam_010
-  // Method: createExam
-  // Purpose: To create exam with duration 50 min
-  // Input: { title: "T", durationMinutes: 50, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_010', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 50, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 50, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(50);
-  });
-
-  // TC_createExam_011
-  // Method: createExam
-  // Purpose: To create exam with duration 55 min
-  // Input: { title: "T", durationMinutes: 55, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_011', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 55, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 55, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(55);
-  });
-
-  // TC_createExam_012
-  // Method: createExam
-  // Purpose: To create exam with duration 60 min
-  // Input: { title: "T", durationMinutes: 60, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_012', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 60, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 60, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(60);
-  });
-
-  // TC_createExam_013
-  // Method: createExam
-  // Purpose: To create exam with duration 65 min
-  // Input: { title: "T", durationMinutes: 65, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_013', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 65, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 65, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(65);
-  });
-
-  // TC_createExam_014
-  // Method: createExam
-  // Purpose: To create exam with duration 70 min
-  // Input: { title: "T", durationMinutes: 70, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_014', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 70, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 70, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(70);
-  });
-
-  // TC_createExam_015
-  // Method: createExam
-  // Purpose: To create exam with duration 75 min
-  // Input: { title: "T", durationMinutes: 75, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_015', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 75, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 75, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(75);
-  });
-
-  // TC_createExam_016
-  // Method: createExam
-  // Purpose: To create exam with duration 80 min
-  // Input: { title: "T", durationMinutes: 80, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_016', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 80, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 80, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(80);
-  });
-
-  // TC_createExam_017
-  // Method: createExam
-  // Purpose: To create exam with duration 85 min
-  // Input: { title: "T", durationMinutes: 85, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_017', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 85, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 85, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(85);
-  });
-
-  // TC_createExam_018
-  // Method: createExam
-  // Purpose: To create exam with duration 90 min
-  // Input: { title: "T", durationMinutes: 90, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_018', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 90, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 90, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(90);
-  });
-
-  // TC_createExam_019
-  // Method: createExam
-  // Purpose: To create exam with duration 95 min
-  // Input: { title: "T", durationMinutes: 95, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_019', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 95, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 95, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(95);
-  });
-
-  // TC_createExam_020
-  // Method: createExam
-  // Purpose: To create exam with duration 100 min
-  // Input: { title: "T", durationMinutes: 100, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_020', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 100, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 100, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(100);
-  });
-
-  // TC_createExam_021
-  // Method: createExam
-  // Purpose: To create exam with duration 105 min
-  // Input: { title: "T", durationMinutes: 105, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_021', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 105, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 105, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(105);
-  });
-
-  // TC_createExam_022
-  // Method: createExam
-  // Purpose: To create exam with duration 110 min
-  // Input: { title: "T", durationMinutes: 110, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_022', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 110, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 110, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(110);
-  });
-
-  // TC_createExam_023
-  // Method: createExam
-  // Purpose: To create exam with duration 115 min
-  // Input: { title: "T", durationMinutes: 115, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_023', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 115, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 115, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(115);
-  });
-
-  // TC_createExam_024
-  // Method: createExam
-  // Purpose: To create exam with duration 120 min
-  // Input: { title: "T", durationMinutes: 120, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_024', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 120, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 120, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(120);
-  });
-
-  // TC_createExam_025
-  // Method: createExam
-  // Purpose: To create exam with duration 125 min
-  // Input: { title: "T", durationMinutes: 125, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_025', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 125, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 125, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(125);
-  });
-
-  // TC_createExam_026
-  // Method: createExam
-  // Purpose: To create exam with duration 130 min
-  // Input: { title: "T", durationMinutes: 130, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_026', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 130, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 130, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(130);
-  });
-
-  // TC_createExam_027
-  // Method: createExam
-  // Purpose: To create exam with duration 135 min
-  // Input: { title: "T", durationMinutes: 135, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_027', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 135, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 135, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(135);
-  });
-
-  // TC_createExam_028
-  // Method: createExam
-  // Purpose: To create exam with duration 140 min
-  // Input: { title: "T", durationMinutes: 140, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_028', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 140, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 140, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(140);
-  });
-
-  // TC_createExam_029
-  // Method: createExam
-  // Purpose: To create exam with duration 145 min
-  // Input: { title: "T", durationMinutes: 145, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_029', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 145, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 145, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(145);
-  });
-
-  // TC_createExam_030
-  // Method: createExam
-  // Purpose: To create exam with duration 150 min
-  // Input: { title: "T", durationMinutes: 150, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_030', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 150, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 150, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(150);
-  });
-
-  // TC_createExam_031
-  // Method: createExam
-  // Purpose: To create exam with duration 155 min
-  // Input: { title: "T", durationMinutes: 155, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_031', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 155, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 155, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(155);
-  });
-
-  // TC_createExam_032
-  // Method: createExam
-  // Purpose: To create exam with duration 160 min
-  // Input: { title: "T", durationMinutes: 160, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_032', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 160, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 160, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(160);
-  });
-
-  // TC_createExam_033
-  // Method: createExam
-  // Purpose: To create exam with duration 165 min
-  // Input: { title: "T", durationMinutes: 165, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_033', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 165, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 165, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(165);
-  });
-
-  // TC_createExam_034
-  // Method: createExam
-  // Purpose: To create exam with duration 170 min
-  // Input: { title: "T", durationMinutes: 170, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_034', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 170, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 170, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(170);
-  });
-
-  // TC_createExam_035
-  // Method: createExam
-  // Purpose: To create exam with duration 175 min
-  // Input: { title: "T", durationMinutes: 175, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_035', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 175, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 175, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(175);
-  });
-
-  // TC_createExam_036
-  // Method: createExam
-  // Purpose: To create exam with duration 180 min
-  // Input: { title: "T", durationMinutes: 180, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_036', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 180, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 180, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(180);
-  });
-
-  // TC_createExam_037
-  // Method: createExam
-  // Purpose: To create exam with duration 185 min
-  // Input: { title: "T", durationMinutes: 185, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_037', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 185, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 185, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(185);
-  });
-
-  // TC_createExam_038
-  // Method: createExam
-  // Purpose: To create exam with duration 190 min
-  // Input: { title: "T", durationMinutes: 190, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_038', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 190, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 190, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(190);
-  });
-
-  // TC_createExam_039
-  // Method: createExam
-  // Purpose: To create exam with duration 195 min
-  // Input: { title: "T", durationMinutes: 195, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_039', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 195, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 195, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(195);
-  });
-
-  // TC_createExam_040
-  // Method: createExam
-  // Purpose: To create exam with duration 200 min
-  // Input: { title: "T", durationMinutes: 200, ... }
-  // Expected output: Exam object with matching duration
-  // Test result: pass
-  // Note: Time calculation validation
-  // checkdb: Mocked DB insert.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_040', async () => {
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    const mockExam = { _id: mockExamId, publicId: 'E1', title: 'T', startTime: new Date(), endTime: new Date(Date.now() + 10000000), durationMinutes: 200, courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date() };
-    mockExamModel.create.mockResolvedValue([mockExam]);
-
-    const res = await service.createExam({
-      title: 'T', durationMinutes: 200, startTime: new Date().toISOString(), endTime: new Date(Date.now() + 86400000).toISOString(), courseId: mockCourseId.toHexString(),
-      questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }], rateScore: 50
-    } as any, { id: mockTeacherId.toHexString() } as any);
-
-    expect(res.durationMinutes).toBe(200);
-  });
-
-
-  // TC_createExam_Val_001
-  // Method: createExam
-  // Purpose: To fail if window is too short variation 0
-  // Input: Window < duration
+  // Purpose: Verify BadRequestException when endTime is before startTime
+  // Input: CreateExamDto with endTime < startTime
   // Expected output: BadRequestException
   // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB validation.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_Val_001', async () => {
-    const duration = 60;
-    const window = 0; // Less than duration
-    const startTime = new Date();
-    const endTime = new Date(startTime.getTime() + window * 60000);
-    const dto = { title: 'T', durationMinutes: duration, startTime: startTime.toISOString(), endTime: endTime.toISOString(), courseId: mockCourseId.toHexString(), questions: [] };
+  // checkdb: No DB write occurs
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_CREATE_EXAM_002', async () => {
+    const dto = buildValidExamDto({
+      startTime: new Date(Date.now() + 86400000).toISOString(),
+      endTime: new Date(Date.now() + 3600000).toISOString(),
+    });
 
-    await expect(service.createExam(dto as any, { id: mockTeacherId.toHexString() } as any))
-      .rejects.toThrow(BadRequestException);
+    await expect(
+      service.createExam(dto as any, mockTeacherUser as any),
+    ).rejects.toThrow(BadRequestException);
   });
 
-  // TC_createExam_Val_002
+  // TC_CREATE_EXAM_003
   // Method: createExam
-  // Purpose: To fail if window is too short variation 1
-  // Input: Window < duration
+  // Purpose: Verify BadRequestException when exam window (endTime - startTime) is shorter than durationMinutes
+  // Input: CreateExamDto with durationMinutes=120 but window only 30 minutes
   // Expected output: BadRequestException
   // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB validation.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_Val_002', async () => {
-    const duration = 60;
-    const window = 2; // Less than duration
-    const startTime = new Date();
-    const endTime = new Date(startTime.getTime() + window * 60000);
-    const dto = { title: 'T', durationMinutes: duration, startTime: startTime.toISOString(), endTime: endTime.toISOString(), courseId: mockCourseId.toHexString(), questions: [] };
+  // checkdb: No DB write occurs
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_CREATE_EXAM_003', async () => {
+    const startTime = new Date(Date.now() + 3600000);
+    const endTime = new Date(startTime.getTime() + 30 * 60000); // 30 min window
+    const dto = buildValidExamDto({
+      durationMinutes: 120,
+      startTime: startTime.toISOString(),
+      endTime: endTime.toISOString(),
+    });
 
-    await expect(service.createExam(dto as any, { id: mockTeacherId.toHexString() } as any))
-      .rejects.toThrow(BadRequestException);
+    await expect(
+      service.createExam(dto as any, mockTeacherUser as any),
+    ).rejects.toThrow(BadRequestException);
   });
 
-  // TC_createExam_Val_003
+  // TC_CREATE_EXAM_004
   // Method: createExam
-  // Purpose: To fail if window is too short variation 2
-  // Input: Window < duration
+  // Purpose: Verify NotFoundException when courseId does not exist
+  // Input: CreateExamDto with non-existent courseId
+  // Expected output: NotFoundException
+  // Test result: pass
+  // checkdb: Verifies courseModel.findById called, returns null
+  // rollback: Transaction aborted via mockSession.abortTransaction
+  it('TC_CREATE_EXAM_004', async () => {
+    mockCourseModel.findById.mockResolvedValue(null);
+
+    await expect(
+      service.createExam(buildValidExamDto() as any, mockTeacherUser as any),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  // TC_CREATE_EXAM_005
+  // Method: createExam
+  // Purpose: Verify ForbiddenException when teacher is not the owner of the course
+  // Input: CreateExamDto with courseId owned by a different teacher
+  // Expected output: ForbiddenException
+  // Test result: pass
+  // checkdb: Verifies courseModel.findById called, teacherId mismatch detected
+  // rollback: Transaction aborted via mockSession.abortTransaction
+  it('TC_CREATE_EXAM_005', async () => {
+    const otherTeacherId = new Types.ObjectId();
+    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: otherTeacherId });
+
+    await expect(
+      service.createExam(buildValidExamDto() as any, mockTeacherUser as any),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  // TC_CREATE_EXAM_006
+  // Method: createExam
+  // Purpose: Verify that questions are inserted via insertMany within the transaction
+  // Input: Valid CreateExamDto with 1 question containing 4 choices
+  // Expected output: questionModel.insertMany called with correct question data and session
+  // Test result: pass
+  // checkdb: Verifies insertMany called with session option for transactional integrity
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_CREATE_EXAM_006', async () => {
+    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
+    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
+    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
+    mockExamModel.create.mockResolvedValue([{
+      _id: mockExamId, publicId: 'E-123456', title: 'T', durationMinutes: 60,
+      startTime: new Date(), endTime: new Date(Date.now() + 86400000),
+      courseId: mockCourseId, questions: [mockQ._id], createdAt: new Date(),
+    }]);
+
+    await service.createExam(buildValidExamDto() as any, mockTeacherUser as any);
+
+    expect(mockQuestionModel.insertMany).toHaveBeenCalledTimes(1);
+    const insertCall = mockQuestionModel.insertMany.mock.calls[0];
+    expect(insertCall[1]).toEqual({ session: mockSession });
+  });
+
+  // TC_CREATE_EXAM_007
+  // Method: createExam
+  // Purpose: Verify transaction is aborted when an error occurs during creation
+  // Input: Valid CreateExamDto but examModel.create throws an error
+  // Expected output: Error propagated, abortTransaction called
+  // Test result: pass
+  // checkdb: Verifies abortTransaction was called on error, endSession called for cleanup
+  // rollback: Transaction aborted via mockSession.abortTransaction
+  it('TC_CREATE_EXAM_007', async () => {
+    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
+    mockQuestionModel.insertMany.mockResolvedValue([{ _id: new Types.ObjectId() }]);
+    mockExamModel.create.mockRejectedValue(new Error('DB create failed'));
+
+    await expect(
+      service.createExam(buildValidExamDto() as any, mockTeacherUser as any),
+    ).rejects.toThrow('DB create failed');
+
+    expect(mockSession.abortTransaction).toHaveBeenCalled();
+    expect(mockSession.endSession).toHaveBeenCalled();
+  });
+
+  // TC_CREATE_EXAM_008
+  // Method: createExam
+  // Purpose: Verify correct answer marking - answerQuestion sets isCorrect on the correct choice
+  // Input: CreateExamDto with answerQuestion=2 (2nd choice is correct)
+  // Expected output: insertMany called with answer array where index 1 has isCorrect=true
+  // Test result: pass
+  // checkdb: Verifies the answer transformation logic in createExam
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_CREATE_EXAM_008', async () => {
+    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
+    const qId = new Types.ObjectId();
+    mockQuestionModel.insertMany.mockResolvedValue([{ _id: qId, content: 'Capital of France?', answerQuestion: 2, answer: [{ content: 'London', isCorrect: false }, { content: 'Paris', isCorrect: true }, { content: 'Berlin', isCorrect: false }, { content: 'Madrid', isCorrect: false }] }]);
+    mockExamModel.create.mockResolvedValue([{
+      _id: mockExamId, publicId: 'E-123456', title: 'T', durationMinutes: 30,
+      startTime: new Date(), endTime: new Date(Date.now() + 86400000),
+      courseId: mockCourseId, questions: [qId], createdAt: new Date(),
+    }]);
+
+    const dto = buildValidExamDto({
+      questions: [{
+        content: 'Capital of France?',
+        answerQuestion: 2,
+        answer: [{ content: 'London' }, { content: 'Paris' }, { content: 'Berlin' }, { content: 'Madrid' }],
+      }],
+    });
+
+    await service.createExam(dto as any, mockTeacherUser as any);
+
+    const insertedQuestions = mockQuestionModel.insertMany.mock.calls[0][0];
+    expect(insertedQuestions[0].answer[0].isCorrect).toBe(false);
+    expect(insertedQuestions[0].answer[1].isCorrect).toBe(true);
+    expect(insertedQuestions[0].answer[2].isCorrect).toBe(false);
+    expect(insertedQuestions[0].answer[3].isCorrect).toBe(false);
+  });
+
+  // TC_CREATE_EXAM_009
+  // Method: createExam
+  // Purpose: Verify exam creation with minimum duration (1 minute)
+  // Input: CreateExamDto with durationMinutes=1, sufficient time window
+  // Expected output: Exam created with durationMinutes=1
+  // Test result: pass
+  // checkdb: Verifies examModel.create called with durationMinutes=1
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_CREATE_EXAM_009', async () => {
+    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
+    const qId = new Types.ObjectId();
+    mockQuestionModel.insertMany.mockResolvedValue([{ _id: qId, content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] }]);
+    mockExamModel.create.mockResolvedValue([{
+      _id: mockExamId, publicId: 'E-123456', title: 'Quick Quiz',
+      durationMinutes: 1, startTime: new Date(), endTime: new Date(Date.now() + 86400000),
+      courseId: mockCourseId, questions: [qId], createdAt: new Date(),
+    }]);
+
+    const result = await service.createExam(
+      buildValidExamDto({ durationMinutes: 1 }) as any,
+      mockTeacherUser as any,
+    );
+
+    expect(result.durationMinutes).toBe(1);
+  });
+
+  // TC_CREATE_EXAM_010
+  // Method: createExam
+  // Purpose: Verify exam creation with long duration (180 minutes)
+  // Input: CreateExamDto with durationMinutes=180
+  // Expected output: Exam created with durationMinutes=180
+  // Test result: pass
+  // checkdb: Verifies examModel.create called with durationMinutes=180
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_CREATE_EXAM_010', async () => {
+    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
+    const qId = new Types.ObjectId();
+    mockQuestionModel.insertMany.mockResolvedValue([{ _id: qId, content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] }]);
+    mockExamModel.create.mockResolvedValue([{
+      _id: mockExamId, publicId: 'E-123456', title: 'Final Exam',
+      durationMinutes: 180, startTime: new Date(), endTime: new Date(Date.now() + 86400000),
+      courseId: mockCourseId, questions: [qId], createdAt: new Date(),
+    }]);
+
+    const result = await service.createExam(
+      buildValidExamDto({ durationMinutes: 180 }) as any,
+      mockTeacherUser as any,
+    );
+
+    expect(result.durationMinutes).toBe(180);
+  });
+
+
+  // TC_CREATE_EXAM_011
+  // Method: createExam
+  // Purpose: Verify ForbiddenException when teacher context is missing (user.id undefined)
+  // Input: user = { role: 'teacher' } (no id)
+  // Expected output: ForbiddenException "Missing teacher context"
+  // Test result: pass
+  // checkdb: No DB access
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_CREATE_EXAM_011', async () => {
+    await expect(
+      service.createExam(buildValidExamDto() as any, { role: 'teacher' } as any),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  // TC_CREATE_EXAM_012
+  // Method: createExam
+  // Purpose: Verify ForbiddenException when teacher.id is not a valid ObjectId
+  // Input: user = { id: 'bad-id', role: 'teacher' }
+  // Expected output: ForbiddenException "Invalid teacher identifier"
+  // Test result: pass
+  // checkdb: No DB access
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_CREATE_EXAM_012', async () => {
+    await expect(
+      service.createExam(buildValidExamDto() as any, { id: 'bad-id', role: 'teacher' } as any),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  // TC_CREATE_EXAM_013
+  // Method: createExam
+  // Purpose: Verify BadRequestException for invalid courseId format
+  // Input: CreateExamDto with courseId = 'invalid'
+  // Expected output: BadRequestException "Invalid courseId"
+  // Test result: pass
+  // checkdb: No DB access
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_CREATE_EXAM_013', async () => {
+    await expect(
+      service.createExam(buildValidExamDto({ courseId: 'invalid' }) as any, mockTeacherUser as any),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  // TC_CREATE_EXAM_014
+  // Method: createExam
+  // Purpose: Verify BadRequestException for invalid date strings (NaN dates)
+  // Input: CreateExamDto with startTime = 'not-a-date'
+  // Expected output: BadRequestException "Invalid start or end time"
+  // Test result: pass
+  // checkdb: No DB access
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_CREATE_EXAM_014', async () => {
+    await expect(
+      service.createExam(buildValidExamDto({ startTime: 'not-a-date' }) as any, mockTeacherUser as any),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  // TC_CREATE_EXAM_015
+  // Method: createExam
+  // Purpose: Verify BadRequestException when durationMinutes is 0
+  // Input: CreateExamDto with durationMinutes = 0
+  // Expected output: BadRequestException "durationMinutes must be greater than 0"
+  // Test result: pass
+  // checkdb: No DB access
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_CREATE_EXAM_015', async () => {
+    await expect(
+      service.createExam(buildValidExamDto({ durationMinutes: 0 }) as any, mockTeacherUser as any),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  // TC_CREATE_EXAM_016
+  // Method: createExam
+  // Purpose: Verify BadRequestException when durationMinutes is negative
+  // Input: CreateExamDto with durationMinutes = -10
   // Expected output: BadRequestException
   // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB validation.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_Val_003', async () => {
-    const duration = 60;
-    const window = 4; // Less than duration
-    const startTime = new Date();
-    const endTime = new Date(startTime.getTime() + window * 60000);
-    const dto = { title: 'T', durationMinutes: duration, startTime: startTime.toISOString(), endTime: endTime.toISOString(), courseId: mockCourseId.toHexString(), questions: [] };
-
-    await expect(service.createExam(dto as any, { id: mockTeacherId.toHexString() } as any))
-      .rejects.toThrow(BadRequestException);
+  // checkdb: No DB access
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_CREATE_EXAM_016', async () => {
+    await expect(
+      service.createExam(buildValidExamDto({ durationMinutes: -10 }) as any, mockTeacherUser as any),
+    ).rejects.toThrow(BadRequestException);
   });
 
-  // TC_createExam_Val_004
+  // TC_CREATE_EXAM_017
   // Method: createExam
-  // Purpose: To fail if window is too short variation 3
-  // Input: Window < duration
-  // Expected output: BadRequestException
+  // Purpose: Verify exam status defaults to 'scheduled' when not provided
+  // Input: CreateExamDto without status field
+  // Expected output: examModel.create called with status 'scheduled'
   // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB validation.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_Val_004', async () => {
-    const duration = 60;
-    const window = 6; // Less than duration
-    const startTime = new Date();
-    const endTime = new Date(startTime.getTime() + window * 60000);
-    const dto = { title: 'T', durationMinutes: duration, startTime: startTime.toISOString(), endTime: endTime.toISOString(), courseId: mockCourseId.toHexString(), questions: [] };
+  // checkdb: Verifies create called with default status
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_CREATE_EXAM_017', async () => {
+    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
+    const qId = new Types.ObjectId();
+    mockQuestionModel.insertMany.mockResolvedValue([{ _id: qId, content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] }]);
+    mockExamModel.create.mockResolvedValue([{
+      _id: mockExamId, publicId: 'E-123456', title: 'Default Status',
+      durationMinutes: 60, startTime: new Date(), endTime: new Date(Date.now() + 86400000),
+      status: 'scheduled', courseId: mockCourseId, questions: [qId], createdAt: new Date(),
+    }]);
 
-    await expect(service.createExam(dto as any, { id: mockTeacherId.toHexString() } as any))
-      .rejects.toThrow(BadRequestException);
+    const result = await service.createExam(buildValidExamDto() as any, mockTeacherUser as any);
+
+    expect(result.status).toBe('scheduled');
   });
 
-  // TC_createExam_Val_005
+  // TC_CREATE_EXAM_018
   // Method: createExam
-  // Purpose: To fail if window is too short variation 4
-  // Input: Window < duration
-  // Expected output: BadRequestException
+  // Purpose: Verify exam creation with multiple questions (3 questions)
+  // Input: CreateExamDto with 3 questions
+  // Expected output: insertMany called with 3 question objects
   // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB validation.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_Val_005', async () => {
-    const duration = 60;
-    const window = 8; // Less than duration
-    const startTime = new Date();
-    const endTime = new Date(startTime.getTime() + window * 60000);
-    const dto = { title: 'T', durationMinutes: duration, startTime: startTime.toISOString(), endTime: endTime.toISOString(), courseId: mockCourseId.toHexString(), questions: [] };
+  // checkdb: Verifies insertMany receives array of 3 questions
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_CREATE_EXAM_018', async () => {
+    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
+    const qIds = [new Types.ObjectId(), new Types.ObjectId(), new Types.ObjectId()];
+    const mockQs = qIds.map((id, i) => ({ _id: id, content: `Q${i}`, answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] }));
+    mockQuestionModel.insertMany.mockResolvedValue(mockQs);
+    mockExamModel.create.mockResolvedValue([{
+      _id: mockExamId, publicId: 'E-123456', title: 'Multi Q',
+      durationMinutes: 60, startTime: new Date(), endTime: new Date(Date.now() + 86400000),
+      status: 'scheduled', courseId: mockCourseId, questions: qIds, createdAt: new Date(),
+    }]);
 
-    await expect(service.createExam(dto as any, { id: mockTeacherId.toHexString() } as any))
-      .rejects.toThrow(BadRequestException);
+    const threeQs = [1, 2, 3].map(n => ({
+      content: `Q${n}`, answerQuestion: 1,
+      answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }],
+    }));
+
+    const result = await service.createExam(buildValidExamDto({ questions: threeQs }) as any, mockTeacherUser as any);
+
+    expect(result.questions).toHaveLength(3);
+    expect(mockQuestionModel.insertMany.mock.calls[0][0]).toHaveLength(3);
   });
 
-  // TC_createExam_Val_006
+  // TC_CREATE_EXAM_019
   // Method: createExam
-  // Purpose: To fail if window is too short variation 5
-  // Input: Window < duration
-  // Expected output: BadRequestException
+  // Purpose: Verify rateScore is preserved in the created exam response
+  // Input: CreateExamDto with rateScore = 75
+  // Expected output: ExamResponseDto with rateScore === 75
   // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB validation.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_Val_006', async () => {
-    const duration = 60;
-    const window = 10; // Less than duration
-    const startTime = new Date();
-    const endTime = new Date(startTime.getTime() + window * 60000);
-    const dto = { title: 'T', durationMinutes: duration, startTime: startTime.toISOString(), endTime: endTime.toISOString(), courseId: mockCourseId.toHexString(), questions: [] };
+  // checkdb: Verifies create called with rateScore
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_CREATE_EXAM_019', async () => {
+    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
+    const qId = new Types.ObjectId();
+    mockQuestionModel.insertMany.mockResolvedValue([{ _id: qId, content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] }]);
+    mockExamModel.create.mockResolvedValue([{
+      _id: mockExamId, publicId: 'E-123456', title: 'Rate Test',
+      durationMinutes: 60, startTime: new Date(), endTime: new Date(Date.now() + 86400000),
+      status: 'scheduled', courseId: mockCourseId, questions: [qId], rateScore: 75, createdAt: new Date(),
+    }]);
 
-    await expect(service.createExam(dto as any, { id: mockTeacherId.toHexString() } as any))
-      .rejects.toThrow(BadRequestException);
+    const result = await service.createExam(buildValidExamDto({ rateScore: 75 }) as any, mockTeacherUser as any);
+
+    expect(result.rateScore).toBe(75);
   });
 
-  // TC_createExam_Val_007
+  // TC_CREATE_EXAM_020
   // Method: createExam
-  // Purpose: To fail if window is too short variation 6
-  // Input: Window < duration
-  // Expected output: BadRequestException
+  // Purpose: Verify BadRequestException when answerQuestion references non-existent choice
+  // Input: CreateExamDto with answerQuestion=5 but only 4 choices
+  // Expected output: BadRequestException "answerQuestion must reference one of the provided choices"
   // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB validation.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_Val_007', async () => {
-    const duration = 60;
-    const window = 12; // Less than duration
-    const startTime = new Date();
-    const endTime = new Date(startTime.getTime() + window * 60000);
-    const dto = { title: 'T', durationMinutes: duration, startTime: startTime.toISOString(), endTime: endTime.toISOString(), courseId: mockCourseId.toHexString(), questions: [] };
-
-    await expect(service.createExam(dto as any, { id: mockTeacherId.toHexString() } as any))
-      .rejects.toThrow(BadRequestException);
-  });
-
-  // TC_createExam_Val_008
-  // Method: createExam
-  // Purpose: To fail if window is too short variation 7
-  // Input: Window < duration
-  // Expected output: BadRequestException
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB validation.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_Val_008', async () => {
-    const duration = 60;
-    const window = 14; // Less than duration
-    const startTime = new Date();
-    const endTime = new Date(startTime.getTime() + window * 60000);
-    const dto = { title: 'T', durationMinutes: duration, startTime: startTime.toISOString(), endTime: endTime.toISOString(), courseId: mockCourseId.toHexString(), questions: [] };
-
-    await expect(service.createExam(dto as any, { id: mockTeacherId.toHexString() } as any))
-      .rejects.toThrow(BadRequestException);
-  });
-
-  // TC_createExam_Val_009
-  // Method: createExam
-  // Purpose: To fail if window is too short variation 8
-  // Input: Window < duration
-  // Expected output: BadRequestException
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB validation.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_Val_009', async () => {
-    const duration = 60;
-    const window = 16; // Less than duration
-    const startTime = new Date();
-    const endTime = new Date(startTime.getTime() + window * 60000);
-    const dto = { title: 'T', durationMinutes: duration, startTime: startTime.toISOString(), endTime: endTime.toISOString(), courseId: mockCourseId.toHexString(), questions: [] };
-
-    await expect(service.createExam(dto as any, { id: mockTeacherId.toHexString() } as any))
-      .rejects.toThrow(BadRequestException);
-  });
-
-  // TC_createExam_Val_010
-  // Method: createExam
-  // Purpose: To fail if window is too short variation 9
-  // Input: Window < duration
-  // Expected output: BadRequestException
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB validation.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_Val_010', async () => {
-    const duration = 60;
-    const window = 18; // Less than duration
-    const startTime = new Date();
-    const endTime = new Date(startTime.getTime() + window * 60000);
-    const dto = { title: 'T', durationMinutes: duration, startTime: startTime.toISOString(), endTime: endTime.toISOString(), courseId: mockCourseId.toHexString(), questions: [] };
-
-    await expect(service.createExam(dto as any, { id: mockTeacherId.toHexString() } as any))
-      .rejects.toThrow(BadRequestException);
-  });
-
-  // TC_createExam_Val_011
-  // Method: createExam
-  // Purpose: To fail if window is too short variation 10
-  // Input: Window < duration
-  // Expected output: BadRequestException
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB validation.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_Val_011', async () => {
-    const duration = 60;
-    const window = 20; // Less than duration
-    const startTime = new Date();
-    const endTime = new Date(startTime.getTime() + window * 60000);
-    const dto = { title: 'T', durationMinutes: duration, startTime: startTime.toISOString(), endTime: endTime.toISOString(), courseId: mockCourseId.toHexString(), questions: [] };
-
-    await expect(service.createExam(dto as any, { id: mockTeacherId.toHexString() } as any))
-      .rejects.toThrow(BadRequestException);
-  });
-
-  // TC_createExam_Val_012
-  // Method: createExam
-  // Purpose: To fail if window is too short variation 11
-  // Input: Window < duration
-  // Expected output: BadRequestException
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB validation.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_Val_012', async () => {
-    const duration = 60;
-    const window = 22; // Less than duration
-    const startTime = new Date();
-    const endTime = new Date(startTime.getTime() + window * 60000);
-    const dto = { title: 'T', durationMinutes: duration, startTime: startTime.toISOString(), endTime: endTime.toISOString(), courseId: mockCourseId.toHexString(), questions: [] };
-
-    await expect(service.createExam(dto as any, { id: mockTeacherId.toHexString() } as any))
-      .rejects.toThrow(BadRequestException);
-  });
-
-  // TC_createExam_Val_013
-  // Method: createExam
-  // Purpose: To fail if window is too short variation 12
-  // Input: Window < duration
-  // Expected output: BadRequestException
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB validation.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_Val_013', async () => {
-    const duration = 60;
-    const window = 24; // Less than duration
-    const startTime = new Date();
-    const endTime = new Date(startTime.getTime() + window * 60000);
-    const dto = { title: 'T', durationMinutes: duration, startTime: startTime.toISOString(), endTime: endTime.toISOString(), courseId: mockCourseId.toHexString(), questions: [] };
-
-    await expect(service.createExam(dto as any, { id: mockTeacherId.toHexString() } as any))
-      .rejects.toThrow(BadRequestException);
-  });
-
-  // TC_createExam_Val_014
-  // Method: createExam
-  // Purpose: To fail if window is too short variation 13
-  // Input: Window < duration
-  // Expected output: BadRequestException
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB validation.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_Val_014', async () => {
-    const duration = 60;
-    const window = 26; // Less than duration
-    const startTime = new Date();
-    const endTime = new Date(startTime.getTime() + window * 60000);
-    const dto = { title: 'T', durationMinutes: duration, startTime: startTime.toISOString(), endTime: endTime.toISOString(), courseId: mockCourseId.toHexString(), questions: [] };
-
-    await expect(service.createExam(dto as any, { id: mockTeacherId.toHexString() } as any))
-      .rejects.toThrow(BadRequestException);
-  });
-
-  // TC_createExam_Val_015
-  // Method: createExam
-  // Purpose: To fail if window is too short variation 14
-  // Input: Window < duration
-  // Expected output: BadRequestException
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB validation.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_Val_015', async () => {
-    const duration = 60;
-    const window = 28; // Less than duration
-    const startTime = new Date();
-    const endTime = new Date(startTime.getTime() + window * 60000);
-    const dto = { title: 'T', durationMinutes: duration, startTime: startTime.toISOString(), endTime: endTime.toISOString(), courseId: mockCourseId.toHexString(), questions: [] };
-
-    await expect(service.createExam(dto as any, { id: mockTeacherId.toHexString() } as any))
-      .rejects.toThrow(BadRequestException);
-  });
-
-  // TC_createExam_Val_016
-  // Method: createExam
-  // Purpose: To fail if window is too short variation 15
-  // Input: Window < duration
-  // Expected output: BadRequestException
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB validation.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_Val_016', async () => {
-    const duration = 60;
-    const window = 30; // Less than duration
-    const startTime = new Date();
-    const endTime = new Date(startTime.getTime() + window * 60000);
-    const dto = { title: 'T', durationMinutes: duration, startTime: startTime.toISOString(), endTime: endTime.toISOString(), courseId: mockCourseId.toHexString(), questions: [] };
-
-    await expect(service.createExam(dto as any, { id: mockTeacherId.toHexString() } as any))
-      .rejects.toThrow(BadRequestException);
-  });
-
-  // TC_createExam_Val_017
-  // Method: createExam
-  // Purpose: To fail if window is too short variation 16
-  // Input: Window < duration
-  // Expected output: BadRequestException
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB validation.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_Val_017', async () => {
-    const duration = 60;
-    const window = 32; // Less than duration
-    const startTime = new Date();
-    const endTime = new Date(startTime.getTime() + window * 60000);
-    const dto = { title: 'T', durationMinutes: duration, startTime: startTime.toISOString(), endTime: endTime.toISOString(), courseId: mockCourseId.toHexString(), questions: [] };
-
-    await expect(service.createExam(dto as any, { id: mockTeacherId.toHexString() } as any))
-      .rejects.toThrow(BadRequestException);
-  });
-
-  // TC_createExam_Val_018
-  // Method: createExam
-  // Purpose: To fail if window is too short variation 17
-  // Input: Window < duration
-  // Expected output: BadRequestException
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB validation.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_Val_018', async () => {
-    const duration = 60;
-    const window = 34; // Less than duration
-    const startTime = new Date();
-    const endTime = new Date(startTime.getTime() + window * 60000);
-    const dto = { title: 'T', durationMinutes: duration, startTime: startTime.toISOString(), endTime: endTime.toISOString(), courseId: mockCourseId.toHexString(), questions: [] };
-
-    await expect(service.createExam(dto as any, { id: mockTeacherId.toHexString() } as any))
-      .rejects.toThrow(BadRequestException);
-  });
-
-  // TC_createExam_Val_019
-  // Method: createExam
-  // Purpose: To fail if window is too short variation 18
-  // Input: Window < duration
-  // Expected output: BadRequestException
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB validation.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_Val_019', async () => {
-    const duration = 60;
-    const window = 36; // Less than duration
-    const startTime = new Date();
-    const endTime = new Date(startTime.getTime() + window * 60000);
-    const dto = { title: 'T', durationMinutes: duration, startTime: startTime.toISOString(), endTime: endTime.toISOString(), courseId: mockCourseId.toHexString(), questions: [] };
-
-    await expect(service.createExam(dto as any, { id: mockTeacherId.toHexString() } as any))
-      .rejects.toThrow(BadRequestException);
-  });
-
-  // TC_createExam_Val_020
-  // Method: createExam
-  // Purpose: To fail if window is too short variation 19
-  // Input: Window < duration
-  // Expected output: BadRequestException
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB validation.
-  // rollback: jest.clearAllMocks()
-  it('TC_createExam_Val_020', async () => {
-    const duration = 60;
-    const window = 38; // Less than duration
-    const startTime = new Date();
-    const endTime = new Date(startTime.getTime() + window * 60000);
-    const dto = { title: 'T', durationMinutes: duration, startTime: startTime.toISOString(), endTime: endTime.toISOString(), courseId: mockCourseId.toHexString(), questions: [] };
-
-    await expect(service.createExam(dto as any, { id: mockTeacherId.toHexString() } as any))
-      .rejects.toThrow(BadRequestException);
-  });
-
-
-  // TC_updateExam_001
-  // Method: updateExam
-  // Purpose: To update exam fields variation 1
-  // Input: update DTO
-  // Expected output: Updated exam
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateExam_001', async () => {
-    const now = new Date();
-    const existingExam = { _id: mockExamId, questions: [new Types.ObjectId()], status: 'scheduled' };
-    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(existingExam) });
+  // checkdb: No DB write
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_CREATE_EXAM_020', async () => {
     mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.deleteMany.mockResolvedValue({});
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    mockExamModel.findByIdAndUpdate.mockResolvedValue({ ...existingExam, title: 'U0', courseId: mockCourseId, questions: [mockQ._id], updatedAt: new Date() });
 
-    await service.updateExam(mockExamId.toHexString(), { title: 'U0', durationMinutes: 10, startTime: now.toISOString(), endTime: new Date(now.getTime() + 3600000).toISOString(), courseId: mockCourseId.toHexString(), questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }] } as any, { id: mockTeacherId.toHexString() } as any);
-    expect(mockExamModel.findByIdAndUpdate).toHaveBeenCalled();
+    const dto = buildValidExamDto({
+      questions: [{ content: 'Q', answerQuestion: 5, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }],
+    });
+
+    await expect(
+      service.createExam(dto as any, mockTeacherUser as any),
+    ).rejects.toThrow(BadRequestException);
   });
 
-  // TC_updateExam_002
-  // Method: updateExam
-  // Purpose: To update exam fields variation 2
-  // Input: update DTO
-  // Expected output: Updated exam
+  // ============================================================
+  // findExamById Method Tests
+  // ============================================================
+
+  // TC_FIND_EXAM_001
+  // Method: findExamById
+  // Purpose: Verify successful retrieval of an exam by ID with correct teacher authorization
+  // Input: examId = valid ObjectId, user = course owner teacher
+  // Expected output: Exam detail object with questions populated
   // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateExam_002', async () => {
-    const now = new Date();
-    const existingExam = { _id: mockExamId, questions: [new Types.ObjectId()], status: 'scheduled' };
-    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(existingExam) });
+  // checkdb: Verifies findOne, courseModel.findById, questionModel.find called
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_FIND_EXAM_001', async () => {
+    const qId = new Types.ObjectId();
+    mockExamModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({
+        _id: mockExamId, courseId: mockCourseId, title: 'Exam Detail',
+        durationMinutes: 60, startTime: new Date(), endTime: new Date(),
+        status: 'scheduled', publicId: 'E-001', questions: [qId], rateScore: 50,
+        createdAt: new Date(), updatedAt: new Date(),
+      }),
+    });
     mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.deleteMany.mockResolvedValue({});
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    mockExamModel.findByIdAndUpdate.mockResolvedValue({ ...existingExam, title: 'U1', courseId: mockCourseId, questions: [mockQ._id], updatedAt: new Date() });
+    mockQuestionModel.find.mockReturnValue({
+      exec: jest.fn().mockResolvedValue([{
+        _id: qId, content: 'Q1', answerQuestion: 1,
+        answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }],
+      }]),
+    });
 
-    await service.updateExam(mockExamId.toHexString(), { title: 'U1', durationMinutes: 10, startTime: now.toISOString(), endTime: new Date(now.getTime() + 3600000).toISOString(), courseId: mockCourseId.toHexString(), questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }] } as any, { id: mockTeacherId.toHexString() } as any);
-    expect(mockExamModel.findByIdAndUpdate).toHaveBeenCalled();
+    const result = await service.findExamById(mockExamId.toHexString(), mockTeacherUser as any);
+
+    expect(result).toBeDefined();
+    expect(result.title).toBe('Exam Detail');
+    expect(result.questions).toHaveLength(1);
   });
 
-  // TC_updateExam_003
-  // Method: updateExam
-  // Purpose: To update exam fields variation 3
-  // Input: update DTO
-  // Expected output: Updated exam
+  // TC_FIND_EXAM_002
+  // Method: findExamById
+  // Purpose: Verify NotFoundException when exam does not exist
+  // Input: examId = non-existent ObjectId
+  // Expected output: NotFoundException
   // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateExam_003', async () => {
-    const now = new Date();
-    const existingExam = { _id: mockExamId, questions: [new Types.ObjectId()], status: 'scheduled' };
-    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(existingExam) });
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.deleteMany.mockResolvedValue({});
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    mockExamModel.findByIdAndUpdate.mockResolvedValue({ ...existingExam, title: 'U2', courseId: mockCourseId, questions: [mockQ._id], updatedAt: new Date() });
+  // checkdb: Verifies findOne returns null
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_FIND_EXAM_002', async () => {
+    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(null) });
 
-    await service.updateExam(mockExamId.toHexString(), { title: 'U2', durationMinutes: 10, startTime: now.toISOString(), endTime: new Date(now.getTime() + 3600000).toISOString(), courseId: mockCourseId.toHexString(), questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }] } as any, { id: mockTeacherId.toHexString() } as any);
-    expect(mockExamModel.findByIdAndUpdate).toHaveBeenCalled();
+    await expect(
+      service.findExamById(new Types.ObjectId().toHexString(), mockTeacherUser as any),
+    ).rejects.toThrow(NotFoundException);
   });
 
-  // TC_updateExam_004
-  // Method: updateExam
-  // Purpose: To update exam fields variation 4
-  // Input: update DTO
-  // Expected output: Updated exam
+  // TC_FIND_EXAM_003
+  // Method: findExamById
+  // Purpose: Verify ForbiddenException when teacher is not the course owner
+  // Input: examId = valid, user = teacher who does NOT own the course
+  // Expected output: ForbiddenException
   // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateExam_004', async () => {
-    const now = new Date();
-    const existingExam = { _id: mockExamId, questions: [new Types.ObjectId()], status: 'scheduled' };
-    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(existingExam) });
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.deleteMany.mockResolvedValue({});
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    mockExamModel.findByIdAndUpdate.mockResolvedValue({ ...existingExam, title: 'U3', courseId: mockCourseId, questions: [mockQ._id], updatedAt: new Date() });
+  // checkdb: Verifies teacherId mismatch detected
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_FIND_EXAM_003', async () => {
+    const otherTeacher = new Types.ObjectId();
+    mockExamModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId }),
+    });
+    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: otherTeacher });
 
-    await service.updateExam(mockExamId.toHexString(), { title: 'U3', durationMinutes: 10, startTime: now.toISOString(), endTime: new Date(now.getTime() + 3600000).toISOString(), courseId: mockCourseId.toHexString(), questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }] } as any, { id: mockTeacherId.toHexString() } as any);
-    expect(mockExamModel.findByIdAndUpdate).toHaveBeenCalled();
+    await expect(
+      service.findExamById(mockExamId.toHexString(), mockTeacherUser as any),
+    ).rejects.toThrow(ForbiddenException);
   });
 
-  // TC_updateExam_005
-  // Method: updateExam
-  // Purpose: To update exam fields variation 5
-  // Input: update DTO
-  // Expected output: Updated exam
+  // TC_FIND_EXAM_004
+  // Method: findExamById
+  // Purpose: Verify NotFoundException when the exam's course does not exist
+  // Input: examId = valid, course lookup returns null
+  // Expected output: NotFoundException
   // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateExam_005', async () => {
-    const now = new Date();
-    const existingExam = { _id: mockExamId, questions: [new Types.ObjectId()], status: 'scheduled' };
-    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(existingExam) });
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.deleteMany.mockResolvedValue({});
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    mockExamModel.findByIdAndUpdate.mockResolvedValue({ ...existingExam, title: 'U4', courseId: mockCourseId, questions: [mockQ._id], updatedAt: new Date() });
+  // checkdb: Verifies courseModel.findById returns null
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_FIND_EXAM_004', async () => {
+    mockExamModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId }),
+    });
+    mockCourseModel.findById.mockResolvedValue(null);
 
-    await service.updateExam(mockExamId.toHexString(), { title: 'U4', durationMinutes: 10, startTime: now.toISOString(), endTime: new Date(now.getTime() + 3600000).toISOString(), courseId: mockCourseId.toHexString(), questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }] } as any, { id: mockTeacherId.toHexString() } as any);
-    expect(mockExamModel.findByIdAndUpdate).toHaveBeenCalled();
+    await expect(
+      service.findExamById(mockExamId.toHexString(), mockTeacherUser as any),
+    ).rejects.toThrow(NotFoundException);
   });
 
-  // TC_updateExam_006
-  // Method: updateExam
-  // Purpose: To update exam fields variation 6
-  // Input: update DTO
-  // Expected output: Updated exam
+  // TC_FIND_EXAM_005
+  // Method: findExamById
+  // Purpose: Verify that questions are fetched using the exam's question IDs
+  // Input: examId = valid exam with 2 question IDs
+  // Expected output: questionModel.find called with correct IDs filter
   // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateExam_006', async () => {
-    const now = new Date();
-    const existingExam = { _id: mockExamId, questions: [new Types.ObjectId()], status: 'scheduled' };
-    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(existingExam) });
+  // checkdb: Verifies questionModel.find called with exam's question array
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_FIND_EXAM_005', async () => {
+    const qId1 = new Types.ObjectId();
+    const qId2 = new Types.ObjectId();
+    mockExamModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({
+        _id: mockExamId, courseId: mockCourseId, title: 'Two Qs',
+        durationMinutes: 30, startTime: new Date(), endTime: new Date(),
+        status: 'scheduled', publicId: 'E-002', questions: [qId1, qId2], rateScore: 40,
+        createdAt: new Date(), updatedAt: new Date(),
+      }),
+    });
     mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.deleteMany.mockResolvedValue({});
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    mockExamModel.findByIdAndUpdate.mockResolvedValue({ ...existingExam, title: 'U5', courseId: mockCourseId, questions: [mockQ._id], updatedAt: new Date() });
+    mockQuestionModel.find.mockReturnValue({
+      exec: jest.fn().mockResolvedValue([
+        { _id: qId1, content: 'Q1', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] },
+        { _id: qId2, content: 'Q2', answerQuestion: 2, answer: [{ content: 'X', isCorrect: false }, { content: 'Y', isCorrect: true }, { content: 'Z', isCorrect: false }, { content: 'W', isCorrect: false }] },
+      ]),
+    });
 
-    await service.updateExam(mockExamId.toHexString(), { title: 'U5', durationMinutes: 10, startTime: now.toISOString(), endTime: new Date(now.getTime() + 3600000).toISOString(), courseId: mockCourseId.toHexString(), questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }] } as any, { id: mockTeacherId.toHexString() } as any);
-    expect(mockExamModel.findByIdAndUpdate).toHaveBeenCalled();
+    const result = await service.findExamById(mockExamId.toHexString(), mockTeacherUser as any);
+
+    expect(result.questions).toHaveLength(2);
+    expect(mockQuestionModel.find).toHaveBeenCalledWith({ _id: { $in: [qId1, qId2] } });
   });
 
-  // TC_updateExam_007
-  // Method: updateExam
-  // Purpose: To update exam fields variation 7
-  // Input: update DTO
-  // Expected output: Updated exam
+  // TC_FIND_EXAM_006
+  // Method: findExamById
+  // Purpose: Verify exam lookup by publicId (non-ObjectId string)
+  // Input: examId = 'E-123456' (publicId format, not ObjectId)
+  // Expected output: findOne called with { publicId: 'E-123456' }
   // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateExam_007', async () => {
-    const now = new Date();
-    const existingExam = { _id: mockExamId, questions: [new Types.ObjectId()], status: 'scheduled' };
-    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(existingExam) });
+  // checkdb: Verifies buildExamLookupFilter uses publicId path
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_FIND_EXAM_006', async () => {
+    const qId = new Types.ObjectId();
+    mockExamModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({
+        _id: mockExamId, courseId: mockCourseId, title: 'Public Lookup',
+        durationMinutes: 30, startTime: new Date(), endTime: new Date(),
+        status: 'scheduled', publicId: 'E-123456', questions: [qId], rateScore: 50,
+        createdAt: new Date(), updatedAt: new Date(),
+      }),
+    });
     mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.deleteMany.mockResolvedValue({});
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    mockExamModel.findByIdAndUpdate.mockResolvedValue({ ...existingExam, title: 'U6', courseId: mockCourseId, questions: [mockQ._id], updatedAt: new Date() });
+    mockQuestionModel.find.mockReturnValue({
+      exec: jest.fn().mockResolvedValue([{ _id: qId, content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] }]),
+    });
 
-    await service.updateExam(mockExamId.toHexString(), { title: 'U6', durationMinutes: 10, startTime: now.toISOString(), endTime: new Date(now.getTime() + 3600000).toISOString(), courseId: mockCourseId.toHexString(), questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }] } as any, { id: mockTeacherId.toHexString() } as any);
-    expect(mockExamModel.findByIdAndUpdate).toHaveBeenCalled();
+    await service.findExamById('E-123456', mockTeacherUser as any);
+
+    expect(mockExamModel.findOne).toHaveBeenCalledWith({ publicId: 'E-123456' });
   });
 
-  // TC_updateExam_008
-  // Method: updateExam
-  // Purpose: To update exam fields variation 8
-  // Input: update DTO
-  // Expected output: Updated exam
+  // TC_FIND_EXAM_007
+  // Method: findExamById
+  // Purpose: Verify response contains correct courseId mapping
+  // Input: valid examId, exam has specific courseId
+  // Expected output: ExamResponseDto with courseId as string of original ObjectId
   // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateExam_008', async () => {
-    const now = new Date();
-    const existingExam = { _id: mockExamId, questions: [new Types.ObjectId()], status: 'scheduled' };
-    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(existingExam) });
+  // checkdb: Verifies mapExamResponse courseId conversion
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_FIND_EXAM_007', async () => {
+    const qId = new Types.ObjectId();
+    mockExamModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({
+        _id: mockExamId, courseId: mockCourseId, title: 'CourseId Test',
+        durationMinutes: 45, startTime: new Date(), endTime: new Date(),
+        status: 'active', publicId: 'E-CID', questions: [qId], rateScore: 60,
+        createdAt: new Date(), updatedAt: new Date(),
+      }),
+    });
     mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.deleteMany.mockResolvedValue({});
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    mockExamModel.findByIdAndUpdate.mockResolvedValue({ ...existingExam, title: 'U7', courseId: mockCourseId, questions: [mockQ._id], updatedAt: new Date() });
+    mockQuestionModel.find.mockReturnValue({
+      exec: jest.fn().mockResolvedValue([{ _id: qId, content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] }]),
+    });
 
-    await service.updateExam(mockExamId.toHexString(), { title: 'U7', durationMinutes: 10, startTime: now.toISOString(), endTime: new Date(now.getTime() + 3600000).toISOString(), courseId: mockCourseId.toHexString(), questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }] } as any, { id: mockTeacherId.toHexString() } as any);
-    expect(mockExamModel.findByIdAndUpdate).toHaveBeenCalled();
+    const result = await service.findExamById(mockExamId.toHexString(), mockTeacherUser as any);
+
+    expect(result.courseId).toBe(String(mockCourseId));
   });
 
-  // TC_updateExam_009
-  // Method: updateExam
-  // Purpose: To update exam fields variation 9
-  // Input: update DTO
-  // Expected output: Updated exam
+  // TC_FIND_EXAM_008
+  // Method: findExamById
+  // Purpose: Verify response contains correct rateScore
+  // Input: valid examId, exam has rateScore 80
+  // Expected output: ExamResponseDto with rateScore === 80
   // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateExam_009', async () => {
-    const now = new Date();
-    const existingExam = { _id: mockExamId, questions: [new Types.ObjectId()], status: 'scheduled' };
-    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(existingExam) });
+  // checkdb: Verifies mapExamResponse rateScore mapping
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_FIND_EXAM_008', async () => {
+    const qId = new Types.ObjectId();
+    mockExamModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({
+        _id: mockExamId, courseId: mockCourseId, title: 'Rate Test',
+        durationMinutes: 60, startTime: new Date(), endTime: new Date(),
+        status: 'scheduled', publicId: 'E-R80', questions: [qId], rateScore: 80,
+        createdAt: new Date(), updatedAt: new Date(),
+      }),
+    });
     mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.deleteMany.mockResolvedValue({});
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    mockExamModel.findByIdAndUpdate.mockResolvedValue({ ...existingExam, title: 'U8', courseId: mockCourseId, questions: [mockQ._id], updatedAt: new Date() });
+    mockQuestionModel.find.mockReturnValue({
+      exec: jest.fn().mockResolvedValue([{ _id: qId, content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] }]),
+    });
 
-    await service.updateExam(mockExamId.toHexString(), { title: 'U8', durationMinutes: 10, startTime: now.toISOString(), endTime: new Date(now.getTime() + 3600000).toISOString(), courseId: mockCourseId.toHexString(), questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }] } as any, { id: mockTeacherId.toHexString() } as any);
-    expect(mockExamModel.findByIdAndUpdate).toHaveBeenCalled();
-  });
+    const result = await service.findExamById(mockExamId.toHexString(), mockTeacherUser as any);
 
-  // TC_updateExam_010
-  // Method: updateExam
-  // Purpose: To update exam fields variation 10
-  // Input: update DTO
-  // Expected output: Updated exam
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateExam_010', async () => {
-    const now = new Date();
-    const existingExam = { _id: mockExamId, questions: [new Types.ObjectId()], status: 'scheduled' };
-    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(existingExam) });
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.deleteMany.mockResolvedValue({});
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    mockExamModel.findByIdAndUpdate.mockResolvedValue({ ...existingExam, title: 'U9', courseId: mockCourseId, questions: [mockQ._id], updatedAt: new Date() });
-
-    await service.updateExam(mockExamId.toHexString(), { title: 'U9', durationMinutes: 10, startTime: now.toISOString(), endTime: new Date(now.getTime() + 3600000).toISOString(), courseId: mockCourseId.toHexString(), questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }] } as any, { id: mockTeacherId.toHexString() } as any);
-    expect(mockExamModel.findByIdAndUpdate).toHaveBeenCalled();
-  });
-
-  // TC_updateExam_011
-  // Method: updateExam
-  // Purpose: To update exam fields variation 11
-  // Input: update DTO
-  // Expected output: Updated exam
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateExam_011', async () => {
-    const now = new Date();
-    const existingExam = { _id: mockExamId, questions: [new Types.ObjectId()], status: 'scheduled' };
-    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(existingExam) });
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.deleteMany.mockResolvedValue({});
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    mockExamModel.findByIdAndUpdate.mockResolvedValue({ ...existingExam, title: 'U10', courseId: mockCourseId, questions: [mockQ._id], updatedAt: new Date() });
-
-    await service.updateExam(mockExamId.toHexString(), { title: 'U10', durationMinutes: 10, startTime: now.toISOString(), endTime: new Date(now.getTime() + 3600000).toISOString(), courseId: mockCourseId.toHexString(), questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }] } as any, { id: mockTeacherId.toHexString() } as any);
-    expect(mockExamModel.findByIdAndUpdate).toHaveBeenCalled();
-  });
-
-  // TC_updateExam_012
-  // Method: updateExam
-  // Purpose: To update exam fields variation 12
-  // Input: update DTO
-  // Expected output: Updated exam
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateExam_012', async () => {
-    const now = new Date();
-    const existingExam = { _id: mockExamId, questions: [new Types.ObjectId()], status: 'scheduled' };
-    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(existingExam) });
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.deleteMany.mockResolvedValue({});
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    mockExamModel.findByIdAndUpdate.mockResolvedValue({ ...existingExam, title: 'U11', courseId: mockCourseId, questions: [mockQ._id], updatedAt: new Date() });
-
-    await service.updateExam(mockExamId.toHexString(), { title: 'U11', durationMinutes: 10, startTime: now.toISOString(), endTime: new Date(now.getTime() + 3600000).toISOString(), courseId: mockCourseId.toHexString(), questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }] } as any, { id: mockTeacherId.toHexString() } as any);
-    expect(mockExamModel.findByIdAndUpdate).toHaveBeenCalled();
-  });
-
-  // TC_updateExam_013
-  // Method: updateExam
-  // Purpose: To update exam fields variation 13
-  // Input: update DTO
-  // Expected output: Updated exam
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateExam_013', async () => {
-    const now = new Date();
-    const existingExam = { _id: mockExamId, questions: [new Types.ObjectId()], status: 'scheduled' };
-    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(existingExam) });
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.deleteMany.mockResolvedValue({});
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    mockExamModel.findByIdAndUpdate.mockResolvedValue({ ...existingExam, title: 'U12', courseId: mockCourseId, questions: [mockQ._id], updatedAt: new Date() });
-
-    await service.updateExam(mockExamId.toHexString(), { title: 'U12', durationMinutes: 10, startTime: now.toISOString(), endTime: new Date(now.getTime() + 3600000).toISOString(), courseId: mockCourseId.toHexString(), questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }] } as any, { id: mockTeacherId.toHexString() } as any);
-    expect(mockExamModel.findByIdAndUpdate).toHaveBeenCalled();
-  });
-
-  // TC_updateExam_014
-  // Method: updateExam
-  // Purpose: To update exam fields variation 14
-  // Input: update DTO
-  // Expected output: Updated exam
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateExam_014', async () => {
-    const now = new Date();
-    const existingExam = { _id: mockExamId, questions: [new Types.ObjectId()], status: 'scheduled' };
-    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(existingExam) });
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.deleteMany.mockResolvedValue({});
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    mockExamModel.findByIdAndUpdate.mockResolvedValue({ ...existingExam, title: 'U13', courseId: mockCourseId, questions: [mockQ._id], updatedAt: new Date() });
-
-    await service.updateExam(mockExamId.toHexString(), { title: 'U13', durationMinutes: 10, startTime: now.toISOString(), endTime: new Date(now.getTime() + 3600000).toISOString(), courseId: mockCourseId.toHexString(), questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }] } as any, { id: mockTeacherId.toHexString() } as any);
-    expect(mockExamModel.findByIdAndUpdate).toHaveBeenCalled();
-  });
-
-  // TC_updateExam_015
-  // Method: updateExam
-  // Purpose: To update exam fields variation 15
-  // Input: update DTO
-  // Expected output: Updated exam
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateExam_015', async () => {
-    const now = new Date();
-    const existingExam = { _id: mockExamId, questions: [new Types.ObjectId()], status: 'scheduled' };
-    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(existingExam) });
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.deleteMany.mockResolvedValue({});
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    mockExamModel.findByIdAndUpdate.mockResolvedValue({ ...existingExam, title: 'U14', courseId: mockCourseId, questions: [mockQ._id], updatedAt: new Date() });
-
-    await service.updateExam(mockExamId.toHexString(), { title: 'U14', durationMinutes: 10, startTime: now.toISOString(), endTime: new Date(now.getTime() + 3600000).toISOString(), courseId: mockCourseId.toHexString(), questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }] } as any, { id: mockTeacherId.toHexString() } as any);
-    expect(mockExamModel.findByIdAndUpdate).toHaveBeenCalled();
-  });
-
-  // TC_updateExam_016
-  // Method: updateExam
-  // Purpose: To update exam fields variation 16
-  // Input: update DTO
-  // Expected output: Updated exam
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateExam_016', async () => {
-    const now = new Date();
-    const existingExam = { _id: mockExamId, questions: [new Types.ObjectId()], status: 'scheduled' };
-    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(existingExam) });
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.deleteMany.mockResolvedValue({});
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    mockExamModel.findByIdAndUpdate.mockResolvedValue({ ...existingExam, title: 'U15', courseId: mockCourseId, questions: [mockQ._id], updatedAt: new Date() });
-
-    await service.updateExam(mockExamId.toHexString(), { title: 'U15', durationMinutes: 10, startTime: now.toISOString(), endTime: new Date(now.getTime() + 3600000).toISOString(), courseId: mockCourseId.toHexString(), questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }] } as any, { id: mockTeacherId.toHexString() } as any);
-    expect(mockExamModel.findByIdAndUpdate).toHaveBeenCalled();
-  });
-
-  // TC_updateExam_017
-  // Method: updateExam
-  // Purpose: To update exam fields variation 17
-  // Input: update DTO
-  // Expected output: Updated exam
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateExam_017', async () => {
-    const now = new Date();
-    const existingExam = { _id: mockExamId, questions: [new Types.ObjectId()], status: 'scheduled' };
-    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(existingExam) });
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.deleteMany.mockResolvedValue({});
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    mockExamModel.findByIdAndUpdate.mockResolvedValue({ ...existingExam, title: 'U16', courseId: mockCourseId, questions: [mockQ._id], updatedAt: new Date() });
-
-    await service.updateExam(mockExamId.toHexString(), { title: 'U16', durationMinutes: 10, startTime: now.toISOString(), endTime: new Date(now.getTime() + 3600000).toISOString(), courseId: mockCourseId.toHexString(), questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }] } as any, { id: mockTeacherId.toHexString() } as any);
-    expect(mockExamModel.findByIdAndUpdate).toHaveBeenCalled();
-  });
-
-  // TC_updateExam_018
-  // Method: updateExam
-  // Purpose: To update exam fields variation 18
-  // Input: update DTO
-  // Expected output: Updated exam
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateExam_018', async () => {
-    const now = new Date();
-    const existingExam = { _id: mockExamId, questions: [new Types.ObjectId()], status: 'scheduled' };
-    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(existingExam) });
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.deleteMany.mockResolvedValue({});
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    mockExamModel.findByIdAndUpdate.mockResolvedValue({ ...existingExam, title: 'U17', courseId: mockCourseId, questions: [mockQ._id], updatedAt: new Date() });
-
-    await service.updateExam(mockExamId.toHexString(), { title: 'U17', durationMinutes: 10, startTime: now.toISOString(), endTime: new Date(now.getTime() + 3600000).toISOString(), courseId: mockCourseId.toHexString(), questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }] } as any, { id: mockTeacherId.toHexString() } as any);
-    expect(mockExamModel.findByIdAndUpdate).toHaveBeenCalled();
-  });
-
-  // TC_updateExam_019
-  // Method: updateExam
-  // Purpose: To update exam fields variation 19
-  // Input: update DTO
-  // Expected output: Updated exam
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateExam_019', async () => {
-    const now = new Date();
-    const existingExam = { _id: mockExamId, questions: [new Types.ObjectId()], status: 'scheduled' };
-    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(existingExam) });
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.deleteMany.mockResolvedValue({});
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    mockExamModel.findByIdAndUpdate.mockResolvedValue({ ...existingExam, title: 'U18', courseId: mockCourseId, questions: [mockQ._id], updatedAt: new Date() });
-
-    await service.updateExam(mockExamId.toHexString(), { title: 'U18', durationMinutes: 10, startTime: now.toISOString(), endTime: new Date(now.getTime() + 3600000).toISOString(), courseId: mockCourseId.toHexString(), questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }] } as any, { id: mockTeacherId.toHexString() } as any);
-    expect(mockExamModel.findByIdAndUpdate).toHaveBeenCalled();
-  });
-
-  // TC_updateExam_020
-  // Method: updateExam
-  // Purpose: To update exam fields variation 20
-  // Input: update DTO
-  // Expected output: Updated exam
-  // Test result: pass
-  // Note: None
-  // checkdb: Mocked DB update.
-  // rollback: jest.clearAllMocks()
-  it('TC_updateExam_020', async () => {
-    const now = new Date();
-    const existingExam = { _id: mockExamId, questions: [new Types.ObjectId()], status: 'scheduled' };
-    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(existingExam) });
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.deleteMany.mockResolvedValue({});
-    const mockQ = { _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] };
-    mockQuestionModel.insertMany.mockResolvedValue([mockQ]);
-    mockExamModel.findByIdAndUpdate.mockResolvedValue({ ...existingExam, title: 'U19', courseId: mockCourseId, questions: [mockQ._id], updatedAt: new Date() });
-
-    await service.updateExam(mockExamId.toHexString(), { title: 'U19', durationMinutes: 10, startTime: now.toISOString(), endTime: new Date(now.getTime() + 3600000).toISOString(), courseId: mockCourseId.toHexString(), questions: [{ content: 'Q', answerQuestion: 1, answer: [{ content: 'A' }, { content: 'B' }, { content: 'C' }, { content: 'D' }] }] } as any, { id: mockTeacherId.toHexString() } as any);
-    expect(mockExamModel.findByIdAndUpdate).toHaveBeenCalled();
+    expect(result.rateScore).toBe(80);
   });
 
 
-  // TC_deleteExam_001
+  // ============================================================
+  // deleteExam Method Tests
+  // ============================================================
+
+  // TC_DELETE_EXAM_001
   // Method: deleteExam
-  // Purpose: To delete an exam variation 1
-  // Input: examId, user DTO
+  // Purpose: Verify successful exam deletion with associated questions and submissions cleanup
+  // Input: examId = valid, user = course owner teacher
+  // Expected output: void, deleteOne/deleteMany called for exam, questions, submissions
+  // Test result: pass
+  // checkdb: Verifies examModel.deleteOne, questionModel.deleteMany, submissionModel.deleteMany called
+  // rollback: jest.clearAllMocks() in beforeEach; mocked DB operations
+  it('TC_DELETE_EXAM_001', async () => {
+    const qIds = [new Types.ObjectId(), new Types.ObjectId()];
+    mockExamModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId, questions: qIds }),
+    });
+    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
+    mockQuestionModel.deleteMany.mockResolvedValue({ deletedCount: 2 });
+    mockSubmissionModel.deleteMany.mockResolvedValue({ deletedCount: 0 });
+    mockExamModel.deleteOne.mockResolvedValue({ deletedCount: 1 });
+
+    await service.deleteExam(mockExamId.toHexString(), mockTeacherUser as any);
+
+    expect(mockExamModel.deleteOne).toHaveBeenCalledWith({ _id: mockExamId });
+    expect(mockQuestionModel.deleteMany).toHaveBeenCalled();
+    expect(mockSubmissionModel.deleteMany).toHaveBeenCalled();
+  });
+
+  // TC_DELETE_EXAM_002
+  // Method: deleteExam
+  // Purpose: Verify NotFoundException when exam does not exist
+  // Input: examId = non-existent ObjectId
+  // Expected output: NotFoundException
+  // Test result: pass
+  // checkdb: Verifies findById returns null, no delete operations performed
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_DELETE_EXAM_002', async () => {
+    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(null) });
+
+    await expect(
+      service.deleteExam(new Types.ObjectId().toHexString(), mockTeacherUser as any),
+    ).rejects.toThrow(NotFoundException);
+
+    expect(mockExamModel.deleteOne).not.toHaveBeenCalled();
+  });
+
+  // TC_DELETE_EXAM_003
+  // Method: deleteExam
+  // Purpose: Verify ForbiddenException when teacher is not the course owner
+  // Input: examId = valid, user = different teacher
+  // Expected output: ForbiddenException
+  // Test result: pass
+  // checkdb: Verifies teacherId mismatch detected, no delete operations
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_DELETE_EXAM_003', async () => {
+    mockExamModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId }),
+    });
+    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: new Types.ObjectId() });
+
+    await expect(
+      service.deleteExam(mockExamId.toHexString(), mockTeacherUser as any),
+    ).rejects.toThrow(ForbiddenException);
+
+    expect(mockExamModel.deleteOne).not.toHaveBeenCalled();
+  });
+
+  // TC_DELETE_EXAM_004
+  // Method: deleteExam
+  // Purpose: Verify NotFoundException when the exam's course does not exist
+  // Input: examId = valid, course lookup returns null
+  // Expected output: NotFoundException
+  // Test result: pass
+  // checkdb: Verifies courseModel.findById returns null
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_DELETE_EXAM_004', async () => {
+    mockExamModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId }),
+    });
+    mockCourseModel.findById.mockResolvedValue(null);
+
+    await expect(
+      service.deleteExam(mockExamId.toHexString(), mockTeacherUser as any),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  // TC_DELETE_EXAM_005
+  // Method: deleteExam
+  // Purpose: Verify deleteExam returns void on success
+  // Input: examId = valid, user = course owner
   // Expected output: undefined (void)
   // Test result: pass
-  // Note: Deleting exam
-  // checkdb: Mocked DB delete.
-  // rollback: jest.clearAllMocks()
-  it('TC_deleteExam_001', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockExamModel.findById.mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId }) });
+  // checkdb: Verifies all cleanup operations completed
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_DELETE_EXAM_005', async () => {
+    mockExamModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId, questions: [] }),
+    });
     mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
     mockQuestionModel.deleteMany.mockResolvedValue({});
     mockSubmissionModel.deleteMany.mockResolvedValue({});
+    mockExamModel.deleteOne.mockResolvedValue({ deletedCount: 1 });
 
-    await service.deleteExam(mockExamId.toHexString(), mockUser as any);
-    expect(mockExamModel.deleteOne).toHaveBeenCalled();
+    const result = await service.deleteExam(mockExamId.toHexString(), mockTeacherUser as any);
+
+    expect(result).toBeUndefined();
   });
 
-  // TC_deleteExam_002
+  // TC_DELETE_EXAM_006
   // Method: deleteExam
-  // Purpose: To delete an exam variation 2
-  // Input: examId, user DTO
-  // Expected output: undefined (void)
+  // Purpose: Verify questions deleteMany is called with correct question IDs
+  // Input: examId = valid, exam has 3 question IDs
+  // Expected output: questionModel.deleteMany called with { _id: { $in: questionIds } }
   // Test result: pass
-  // Note: Deleting exam
-  // checkdb: Mocked DB delete.
-  // rollback: jest.clearAllMocks()
-  it('TC_deleteExam_002', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockExamModel.findById.mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId }) });
+  // checkdb: Verifies deleteMany argument contains all question IDs
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_DELETE_EXAM_006', async () => {
+    const qIds = [new Types.ObjectId(), new Types.ObjectId(), new Types.ObjectId()];
+    mockExamModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId, questions: qIds }),
+    });
+    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
+    mockQuestionModel.deleteMany.mockResolvedValue({ deletedCount: 3 });
+    mockSubmissionModel.deleteMany.mockResolvedValue({ deletedCount: 0 });
+    mockExamModel.deleteOne.mockResolvedValue({ deletedCount: 1 });
+
+    await service.deleteExam(mockExamId.toHexString(), mockTeacherUser as any);
+
+    expect(mockQuestionModel.deleteMany).toHaveBeenCalledWith({ _id: { $in: qIds } });
+  });
+
+  // TC_DELETE_EXAM_007
+  // Method: deleteExam
+  // Purpose: Verify submissions deleteMany is called with correct examId
+  // Input: examId = valid, user = course owner
+  // Expected output: submissionModel.deleteMany called with { examId: exam._id }
+  // Test result: pass
+  // checkdb: Verifies submission cleanup uses correct examId
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_DELETE_EXAM_007', async () => {
+    mockExamModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId, questions: [] }),
+    });
+    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
+    mockQuestionModel.deleteMany.mockResolvedValue({});
+    mockSubmissionModel.deleteMany.mockResolvedValue({ deletedCount: 5 });
+    mockExamModel.deleteOne.mockResolvedValue({ deletedCount: 1 });
+
+    await service.deleteExam(mockExamId.toHexString(), mockTeacherUser as any);
+
+    expect(mockSubmissionModel.deleteMany).toHaveBeenCalledWith({ examId: mockExamId });
+  });
+
+  // TC_DELETE_EXAM_008
+  // Method: deleteExam
+  // Purpose: Verify exam lookup by publicId for deletion
+  // Input: examId = 'E-PUB01' (publicId format)
+  // Expected output: findOne called with { publicId: 'E-PUB01' }
+  // Test result: pass
+  // checkdb: Verifies buildExamLookupFilter uses publicId
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_DELETE_EXAM_008', async () => {
+    mockExamModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId, questions: [] }),
+    });
     mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
     mockQuestionModel.deleteMany.mockResolvedValue({});
     mockSubmissionModel.deleteMany.mockResolvedValue({});
+    mockExamModel.deleteOne.mockResolvedValue({ deletedCount: 1 });
 
-    await service.deleteExam(mockExamId.toHexString(), mockUser as any);
-    expect(mockExamModel.deleteOne).toHaveBeenCalled();
+    await service.deleteExam('E-PUB01', mockTeacherUser as any);
+
+    expect(mockExamModel.findOne).toHaveBeenCalledWith({ publicId: 'E-PUB01' });
   });
 
-  // TC_deleteExam_003
-  // Method: deleteExam
-  // Purpose: To delete an exam variation 3
-  // Input: examId, user DTO
-  // Expected output: undefined (void)
+  // ============================================================
+  // updateExam Method Tests
+  // ============================================================
+
+  // Helper to build a valid updateExam DTO
+  const buildValidUpdateDto = (overrides: any = {}) => ({
+    title: 'Updated Exam',
+    durationMinutes: 90,
+    startTime: new Date(Date.now() + 3600000).toISOString(),
+    endTime: new Date(Date.now() + 86400000).toISOString(),
+    courseId: mockCourseId.toHexString(),
+    questions: [{
+      content: 'Updated Q?',
+      answerQuestion: 1,
+      answer: [
+        { content: 'A' },
+        { content: 'B' },
+        { content: 'C' },
+        { content: 'D' },
+      ],
+    }],
+    rateScore: 60,
+    ...overrides,
+  });
+
+  // TC_UPDATE_EXAM_001
+  // Method: updateExam
+  // Purpose: Verify successful exam update with valid input
+  // Input: Valid UpdateExamDto, valid examId, valid teacher user
+  // Expected output: ExamResponseDto with updated title and durationMinutes
   // Test result: pass
-  // Note: Deleting exam
-  // checkdb: Mocked DB delete.
-  // rollback: jest.clearAllMocks()
-  it('TC_deleteExam_003', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockExamModel.findById.mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId }) });
+  // checkdb: Verifies findOne, deleteMany(old questions), insertMany(new), findByIdAndUpdate all called
+  // rollback: jest.clearAllMocks() in beforeEach; transaction mocked
+  it('TC_UPDATE_EXAM_001', async () => {
+    mockExamModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId, questions: [new Types.ObjectId()] }),
+    });
     mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
     mockQuestionModel.deleteMany.mockResolvedValue({});
-    mockSubmissionModel.deleteMany.mockResolvedValue({});
+    const newQId = new Types.ObjectId();
+    mockQuestionModel.insertMany.mockResolvedValue([{
+      _id: newQId, content: 'Updated Q?', answerQuestion: 1,
+      answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }],
+    }]);
+    const updatedExam = {
+      _id: mockExamId, publicId: 'E-123456', title: 'Updated Exam',
+      durationMinutes: 90, startTime: new Date(), endTime: new Date(Date.now() + 86400000),
+      status: 'scheduled', courseId: mockCourseId, questions: [newQId],
+      rateScore: 60, createdAt: new Date(), updatedAt: new Date(),
+    };
+    mockExamModel.findByIdAndUpdate.mockResolvedValue(updatedExam);
+    mockNotificationsService.createNotification.mockResolvedValue(undefined);
 
-    await service.deleteExam(mockExamId.toHexString(), mockUser as any);
-    expect(mockExamModel.deleteOne).toHaveBeenCalled();
+    const result = await service.updateExam(mockExamId.toHexString(), buildValidUpdateDto() as any, mockTeacherUser as any);
+
+    expect(result.title).toBe('Updated Exam');
+    expect(result.durationMinutes).toBe(90);
+    expect(mockSession.commitTransaction).toHaveBeenCalled();
   });
 
-  // TC_deleteExam_004
-  // Method: deleteExam
-  // Purpose: To delete an exam variation 4
-  // Input: examId, user DTO
-  // Expected output: undefined (void)
+  // TC_UPDATE_EXAM_002
+  // Method: updateExam
+  // Purpose: Verify NotFoundException when exam does not exist
+  // Input: examId = non-existent, valid UpdateExamDto
+  // Expected output: NotFoundException
   // Test result: pass
-  // Note: Deleting exam
-  // checkdb: Mocked DB delete.
-  // rollback: jest.clearAllMocks()
-  it('TC_deleteExam_004', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockExamModel.findById.mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId }) });
+  // checkdb: Verifies findOne returns null
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_UPDATE_EXAM_002', async () => {
+    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(null) });
+
+    await expect(
+      service.updateExam(new Types.ObjectId().toHexString(), buildValidUpdateDto() as any, mockTeacherUser as any),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  // TC_UPDATE_EXAM_003
+  // Method: updateExam
+  // Purpose: Verify BadRequestException when endTime is before startTime
+  // Input: UpdateExamDto with endTime < startTime
+  // Expected output: BadRequestException
+  // Test result: pass
+  // checkdb: No DB write occurs
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_UPDATE_EXAM_003', async () => {
+    mockExamModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId, questions: [] }),
+    });
+
+    await expect(
+      service.updateExam(mockExamId.toHexString(), buildValidUpdateDto({
+        startTime: new Date(Date.now() + 86400000).toISOString(),
+        endTime: new Date(Date.now() + 3600000).toISOString(),
+      }) as any, mockTeacherUser as any),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  // TC_UPDATE_EXAM_004
+  // Method: updateExam
+  // Purpose: Verify ForbiddenException when teacher is not the course owner
+  // Input: examId = valid, courseId owned by different teacher
+  // Expected output: ForbiddenException
+  // Test result: pass
+  // checkdb: Verifies teacherId mismatch detected
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_UPDATE_EXAM_004', async () => {
+    mockExamModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId, questions: [] }),
+    });
+    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: new Types.ObjectId() });
+
+    await expect(
+      service.updateExam(mockExamId.toHexString(), buildValidUpdateDto() as any, mockTeacherUser as any),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  // TC_UPDATE_EXAM_005
+  // Method: updateExam
+  // Purpose: Verify ForbiddenException when teacher context is missing (user.id is undefined)
+  // Input: user with id = undefined
+  // Expected output: ForbiddenException with "Missing teacher context"
+  // Test result: pass
+  // checkdb: No DB access
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_UPDATE_EXAM_005', async () => {
+    await expect(
+      service.updateExam(mockExamId.toHexString(), buildValidUpdateDto() as any, { role: 'teacher' } as any),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  // TC_UPDATE_EXAM_006
+  // Method: updateExam
+  // Purpose: Verify ForbiddenException when teacher.id is not a valid ObjectId
+  // Input: user with id = 'invalid-id'
+  // Expected output: ForbiddenException with "Invalid teacher identifier"
+  // Test result: pass
+  // checkdb: No DB access
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_UPDATE_EXAM_006', async () => {
+    await expect(
+      service.updateExam(mockExamId.toHexString(), buildValidUpdateDto() as any, { id: 'invalid-id', role: 'teacher' } as any),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  // TC_UPDATE_EXAM_007
+  // Method: updateExam
+  // Purpose: Verify NotFoundException when course does not exist
+  // Input: valid examId, courseId referencing non-existent course
+  // Expected output: NotFoundException
+  // Test result: pass
+  // checkdb: Verifies courseModel.findById returns null
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_UPDATE_EXAM_007', async () => {
+    mockExamModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId, questions: [] }),
+    });
+    mockCourseModel.findById.mockResolvedValue(null);
+
+    await expect(
+      service.updateExam(mockExamId.toHexString(), buildValidUpdateDto() as any, mockTeacherUser as any),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  // TC_UPDATE_EXAM_008
+  // Method: updateExam
+  // Purpose: Verify transaction is aborted on error during update
+  // Input: Valid input but findByIdAndUpdate throws error
+  // Expected output: Error propagated, abortTransaction called
+  // Test result: pass
+  // checkdb: Verifies abortTransaction and endSession called
+  // rollback: Transaction aborted via mockSession.abortTransaction
+  it('TC_UPDATE_EXAM_008', async () => {
+    mockExamModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId, questions: [] }),
+    });
     mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
     mockQuestionModel.deleteMany.mockResolvedValue({});
-    mockSubmissionModel.deleteMany.mockResolvedValue({});
+    mockQuestionModel.insertMany.mockResolvedValue([{
+      _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1,
+      answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }],
+    }]);
+    mockExamModel.findByIdAndUpdate.mockRejectedValue(new Error('Update DB error'));
 
-    await service.deleteExam(mockExamId.toHexString(), mockUser as any);
-    expect(mockExamModel.deleteOne).toHaveBeenCalled();
+    await expect(
+      service.updateExam(mockExamId.toHexString(), buildValidUpdateDto() as any, mockTeacherUser as any),
+    ).rejects.toThrow('Update DB error');
+
+    expect(mockSession.abortTransaction).toHaveBeenCalled();
+    expect(mockSession.endSession).toHaveBeenCalled();
   });
 
-  // TC_deleteExam_005
-  // Method: deleteExam
-  // Purpose: To delete an exam variation 5
-  // Input: examId, user DTO
-  // Expected output: undefined (void)
+  // TC_UPDATE_EXAM_009
+  // Method: updateExam
+  // Purpose: Verify old questions are deleted before new ones are inserted
+  // Input: Valid update with existing exam having 2 old questions
+  // Expected output: deleteMany called with old question IDs, insertMany called with new questions
   // Test result: pass
-  // Note: Deleting exam
-  // checkdb: Mocked DB delete.
-  // rollback: jest.clearAllMocks()
-  it('TC_deleteExam_005', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockExamModel.findById.mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId }) });
+  // checkdb: Verifies deleteMany and insertMany call order and arguments
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_UPDATE_EXAM_009', async () => {
+    const oldQIds = [new Types.ObjectId(), new Types.ObjectId()];
+    mockExamModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId, questions: oldQIds }),
+    });
+    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
+    mockQuestionModel.deleteMany.mockResolvedValue({ deletedCount: 2 });
+    const newQId = new Types.ObjectId();
+    mockQuestionModel.insertMany.mockResolvedValue([{
+      _id: newQId, content: 'Updated Q?', answerQuestion: 1,
+      answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }],
+    }]);
+    mockExamModel.findByIdAndUpdate.mockResolvedValue({
+      _id: mockExamId, publicId: 'E-123456', title: 'Updated Exam',
+      durationMinutes: 90, startTime: new Date(), endTime: new Date(Date.now() + 86400000),
+      status: 'scheduled', courseId: mockCourseId, questions: [newQId],
+      rateScore: 60, createdAt: new Date(), updatedAt: new Date(),
+    });
+    mockNotificationsService.createNotification.mockResolvedValue(undefined);
+
+    await service.updateExam(mockExamId.toHexString(), buildValidUpdateDto() as any, mockTeacherUser as any);
+
+    expect(mockQuestionModel.deleteMany).toHaveBeenCalledWith(
+      { _id: { $in: oldQIds } },
+      { session: mockSession },
+    );
+    expect(mockQuestionModel.insertMany).toHaveBeenCalledTimes(1);
+  });
+
+  // TC_UPDATE_EXAM_010
+  // Method: updateExam
+  // Purpose: Verify BadRequestException for invalid courseId format
+  // Input: UpdateExamDto with courseId = 'not-an-objectid'
+  // Expected output: BadRequestException with "Invalid courseId"
+  // Test result: pass
+  // checkdb: No DB write occurs
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_UPDATE_EXAM_010', async () => {
+    mockExamModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId, questions: [] }),
+    });
+
+    await expect(
+      service.updateExam(mockExamId.toHexString(), buildValidUpdateDto({ courseId: 'not-an-objectid' }) as any, mockTeacherUser as any),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  // TC_UPDATE_EXAM_011
+  // Method: updateExam
+  // Purpose: Verify NotFoundException when findByIdAndUpdate returns null
+  // Input: Valid update but findByIdAndUpdate returns null
+  // Expected output: NotFoundException "Exam not found during update"
+  // Test result: pass
+  // checkdb: Verifies findByIdAndUpdate returned null
+  // rollback: Transaction aborted
+  it('TC_UPDATE_EXAM_011', async () => {
+    mockExamModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId, questions: [] }),
+    });
     mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
     mockQuestionModel.deleteMany.mockResolvedValue({});
-    mockSubmissionModel.deleteMany.mockResolvedValue({});
+    mockQuestionModel.insertMany.mockResolvedValue([{ _id: new Types.ObjectId(), content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] }]);
+    mockExamModel.findByIdAndUpdate.mockResolvedValue(null);
 
-    await service.deleteExam(mockExamId.toHexString(), mockUser as any);
-    expect(mockExamModel.deleteOne).toHaveBeenCalled();
+    await expect(
+      service.updateExam(mockExamId.toHexString(), buildValidUpdateDto() as any, mockTeacherUser as any),
+    ).rejects.toThrow(NotFoundException);
+
+    expect(mockSession.abortTransaction).toHaveBeenCalled();
   });
 
-  // TC_deleteExam_006
-  // Method: deleteExam
-  // Purpose: To delete an exam variation 6
-  // Input: examId, user DTO
-  // Expected output: undefined (void)
+  // TC_UPDATE_EXAM_012
+  // Method: updateExam
+  // Purpose: Verify BadRequestException when durationMinutes exceeds time window
+  // Input: UpdateExamDto with durationMinutes=300 but window only 60 minutes
+  // Expected output: BadRequestException
   // Test result: pass
-  // Note: Deleting exam
-  // checkdb: Mocked DB delete.
-  // rollback: jest.clearAllMocks()
-  it('TC_deleteExam_006', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockExamModel.findById.mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId }) });
+  // checkdb: No DB write
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_UPDATE_EXAM_012', async () => {
+    const start = new Date(Date.now() + 3600000);
+    const end = new Date(start.getTime() + 60 * 60000);
+    mockExamModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId, questions: [] }),
+    });
+
+    await expect(
+      service.updateExam(mockExamId.toHexString(), buildValidUpdateDto({
+        durationMinutes: 300, startTime: start.toISOString(), endTime: end.toISOString(),
+      }) as any, mockTeacherUser as any),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  // TC_UPDATE_EXAM_013
+  // Method: updateExam
+  // Purpose: Verify findByIdAndUpdate is called with { new: true } option
+  // Input: Valid update
+  // Expected output: findByIdAndUpdate called with options including { new: true }
+  // Test result: pass
+  // checkdb: Verifies update options
+  // rollback: jest.clearAllMocks() in beforeEach
+  it('TC_UPDATE_EXAM_013', async () => {
+    mockExamModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId, questions: [] }),
+    });
     mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
     mockQuestionModel.deleteMany.mockResolvedValue({});
-    mockSubmissionModel.deleteMany.mockResolvedValue({});
+    const qId = new Types.ObjectId();
+    mockQuestionModel.insertMany.mockResolvedValue([{ _id: qId, content: 'Q', answerQuestion: 1, answer: [{ content: 'A', isCorrect: true }, { content: 'B', isCorrect: false }, { content: 'C', isCorrect: false }, { content: 'D', isCorrect: false }] }]);
+    mockExamModel.findByIdAndUpdate.mockResolvedValue({
+      _id: mockExamId, publicId: 'E-123456', title: 'Updated',
+      durationMinutes: 90, startTime: new Date(), endTime: new Date(Date.now() + 86400000),
+      status: 'scheduled', courseId: mockCourseId, questions: [qId],
+      rateScore: 60, createdAt: new Date(), updatedAt: new Date(),
+    });
+    mockNotificationsService.createNotification.mockResolvedValue(undefined);
 
-    await service.deleteExam(mockExamId.toHexString(), mockUser as any);
-    expect(mockExamModel.deleteOne).toHaveBeenCalled();
+    await service.updateExam(mockExamId.toHexString(), buildValidUpdateDto() as any, mockTeacherUser as any);
+
+    expect(mockExamModel.findByIdAndUpdate).toHaveBeenCalledWith(
+      mockExamId.toHexString(),
+      expect.any(Object),
+      expect.objectContaining({ new: true, session: mockSession }),
+    );
   });
-
-  // TC_deleteExam_007
-  // Method: deleteExam
-  // Purpose: To delete an exam variation 7
-  // Input: examId, user DTO
-  // Expected output: undefined (void)
-  // Test result: pass
-  // Note: Deleting exam
-  // checkdb: Mocked DB delete.
-  // rollback: jest.clearAllMocks()
-  it('TC_deleteExam_007', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockExamModel.findById.mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId }) });
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.deleteMany.mockResolvedValue({});
-    mockSubmissionModel.deleteMany.mockResolvedValue({});
-
-    await service.deleteExam(mockExamId.toHexString(), mockUser as any);
-    expect(mockExamModel.deleteOne).toHaveBeenCalled();
-  });
-
-  // TC_deleteExam_008
-  // Method: deleteExam
-  // Purpose: To delete an exam variation 8
-  // Input: examId, user DTO
-  // Expected output: undefined (void)
-  // Test result: pass
-  // Note: Deleting exam
-  // checkdb: Mocked DB delete.
-  // rollback: jest.clearAllMocks()
-  it('TC_deleteExam_008', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockExamModel.findById.mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId }) });
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.deleteMany.mockResolvedValue({});
-    mockSubmissionModel.deleteMany.mockResolvedValue({});
-
-    await service.deleteExam(mockExamId.toHexString(), mockUser as any);
-    expect(mockExamModel.deleteOne).toHaveBeenCalled();
-  });
-
-  // TC_deleteExam_009
-  // Method: deleteExam
-  // Purpose: To delete an exam variation 9
-  // Input: examId, user DTO
-  // Expected output: undefined (void)
-  // Test result: pass
-  // Note: Deleting exam
-  // checkdb: Mocked DB delete.
-  // rollback: jest.clearAllMocks()
-  it('TC_deleteExam_009', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockExamModel.findById.mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId }) });
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.deleteMany.mockResolvedValue({});
-    mockSubmissionModel.deleteMany.mockResolvedValue({});
-
-    await service.deleteExam(mockExamId.toHexString(), mockUser as any);
-    expect(mockExamModel.deleteOne).toHaveBeenCalled();
-  });
-
-  // TC_deleteExam_010
-  // Method: deleteExam
-  // Purpose: To delete an exam variation 10
-  // Input: examId, user DTO
-  // Expected output: undefined (void)
-  // Test result: pass
-  // Note: Deleting exam
-  // checkdb: Mocked DB delete.
-  // rollback: jest.clearAllMocks()
-  it('TC_deleteExam_010', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockExamModel.findById.mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId }) });
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.deleteMany.mockResolvedValue({});
-    mockSubmissionModel.deleteMany.mockResolvedValue({});
-
-    await service.deleteExam(mockExamId.toHexString(), mockUser as any);
-    expect(mockExamModel.deleteOne).toHaveBeenCalled();
-  });
-
-
-  // TC_listExamSummaries_001
-  // Method: listExamSummaries
-  // Purpose: To list exam summaries variation 1
-  // Input: courseId, user DTO
-  // Expected output: array of exam summaries
-  // Test result: pass
-  // Note: Fetching lists
-  // checkdb: Mocked DB find.
-  // rollback: jest.clearAllMocks()
-  it('TC_listExamSummaries_001', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockCourseModel.find.mockReturnValue({ select: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([{ _id: mockCourseId, courseName: 'C' }]) }) });
-    mockExamModel.countDocuments.mockReturnValue({ exec: jest.fn().mockResolvedValue(1) });
-    mockExamModel.find.mockReturnValue({ sort: jest.fn().mockReturnValue({ skip: jest.fn().mockReturnValue({ limit: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([{ _id: mockExamId, courseId: mockCourseId, title: 'Exam 0', startTime: new Date(), endTime: new Date() }]) }) }) }) });
-
-    const result = await service.listExamSummaries(undefined, { search: 'Test' } as any);
-    expect(result).toBeDefined();
-    expect(mockExamModel.find).toHaveBeenCalled();
-  });
-
-  // TC_listExamSummaries_002
-  // Method: listExamSummaries
-  // Purpose: To list exam summaries variation 2
-  // Input: courseId, user DTO
-  // Expected output: array of exam summaries
-  // Test result: pass
-  // Note: Fetching lists
-  // checkdb: Mocked DB find.
-  // rollback: jest.clearAllMocks()
-  it('TC_listExamSummaries_002', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockCourseModel.find.mockReturnValue({ select: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([{ _id: mockCourseId, courseName: 'C' }]) }) });
-    mockExamModel.countDocuments.mockReturnValue({ exec: jest.fn().mockResolvedValue(1) });
-    mockExamModel.find.mockReturnValue({ sort: jest.fn().mockReturnValue({ skip: jest.fn().mockReturnValue({ limit: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([{ _id: mockExamId, courseId: mockCourseId, title: 'Exam 1', startTime: new Date(), endTime: new Date() }]) }) }) }) });
-
-    const result = await service.listExamSummaries(undefined, { search: 'Test' } as any);
-    expect(result).toBeDefined();
-    expect(mockExamModel.find).toHaveBeenCalled();
-  });
-
-  // TC_listExamSummaries_003
-  // Method: listExamSummaries
-  // Purpose: To list exam summaries variation 3
-  // Input: courseId, user DTO
-  // Expected output: array of exam summaries
-  // Test result: pass
-  // Note: Fetching lists
-  // checkdb: Mocked DB find.
-  // rollback: jest.clearAllMocks()
-  it('TC_listExamSummaries_003', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockCourseModel.find.mockReturnValue({ select: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([{ _id: mockCourseId, courseName: 'C' }]) }) });
-    mockExamModel.countDocuments.mockReturnValue({ exec: jest.fn().mockResolvedValue(1) });
-    mockExamModel.find.mockReturnValue({ sort: jest.fn().mockReturnValue({ skip: jest.fn().mockReturnValue({ limit: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([{ _id: mockExamId, courseId: mockCourseId, title: 'Exam 2', startTime: new Date(), endTime: new Date() }]) }) }) }) });
-
-    const result = await service.listExamSummaries(undefined, { search: 'Test' } as any);
-    expect(result).toBeDefined();
-    expect(mockExamModel.find).toHaveBeenCalled();
-  });
-
-  // TC_listExamSummaries_004
-  // Method: listExamSummaries
-  // Purpose: To list exam summaries variation 4
-  // Input: courseId, user DTO
-  // Expected output: array of exam summaries
-  // Test result: pass
-  // Note: Fetching lists
-  // checkdb: Mocked DB find.
-  // rollback: jest.clearAllMocks()
-  it('TC_listExamSummaries_004', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockCourseModel.find.mockReturnValue({ select: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([{ _id: mockCourseId, courseName: 'C' }]) }) });
-    mockExamModel.countDocuments.mockReturnValue({ exec: jest.fn().mockResolvedValue(1) });
-    mockExamModel.find.mockReturnValue({ sort: jest.fn().mockReturnValue({ skip: jest.fn().mockReturnValue({ limit: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([{ _id: mockExamId, courseId: mockCourseId, title: 'Exam 3', startTime: new Date(), endTime: new Date() }]) }) }) }) });
-
-    const result = await service.listExamSummaries(undefined, { search: 'Test' } as any);
-    expect(result).toBeDefined();
-    expect(mockExamModel.find).toHaveBeenCalled();
-  });
-
-  // TC_listExamSummaries_005
-  // Method: listExamSummaries
-  // Purpose: To list exam summaries variation 5
-  // Input: courseId, user DTO
-  // Expected output: array of exam summaries
-  // Test result: pass
-  // Note: Fetching lists
-  // checkdb: Mocked DB find.
-  // rollback: jest.clearAllMocks()
-  it('TC_listExamSummaries_005', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockCourseModel.find.mockReturnValue({ select: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([{ _id: mockCourseId, courseName: 'C' }]) }) });
-    mockExamModel.countDocuments.mockReturnValue({ exec: jest.fn().mockResolvedValue(1) });
-    mockExamModel.find.mockReturnValue({ sort: jest.fn().mockReturnValue({ skip: jest.fn().mockReturnValue({ limit: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([{ _id: mockExamId, courseId: mockCourseId, title: 'Exam 4', startTime: new Date(), endTime: new Date() }]) }) }) }) });
-
-    const result = await service.listExamSummaries(undefined, { search: 'Test' } as any);
-    expect(result).toBeDefined();
-    expect(mockExamModel.find).toHaveBeenCalled();
-  });
-
-  // TC_listExamSummaries_006
-  // Method: listExamSummaries
-  // Purpose: To list exam summaries variation 6
-  // Input: courseId, user DTO
-  // Expected output: array of exam summaries
-  // Test result: pass
-  // Note: Fetching lists
-  // checkdb: Mocked DB find.
-  // rollback: jest.clearAllMocks()
-  it('TC_listExamSummaries_006', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockCourseModel.find.mockReturnValue({ select: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([{ _id: mockCourseId, courseName: 'C' }]) }) });
-    mockExamModel.countDocuments.mockReturnValue({ exec: jest.fn().mockResolvedValue(1) });
-    mockExamModel.find.mockReturnValue({ sort: jest.fn().mockReturnValue({ skip: jest.fn().mockReturnValue({ limit: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([{ _id: mockExamId, courseId: mockCourseId, title: 'Exam 5', startTime: new Date(), endTime: new Date() }]) }) }) }) });
-
-    const result = await service.listExamSummaries(undefined, { search: 'Test' } as any);
-    expect(result).toBeDefined();
-    expect(mockExamModel.find).toHaveBeenCalled();
-  });
-
-  // TC_listExamSummaries_007
-  // Method: listExamSummaries
-  // Purpose: To list exam summaries variation 7
-  // Input: courseId, user DTO
-  // Expected output: array of exam summaries
-  // Test result: pass
-  // Note: Fetching lists
-  // checkdb: Mocked DB find.
-  // rollback: jest.clearAllMocks()
-  it('TC_listExamSummaries_007', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockCourseModel.find.mockReturnValue({ select: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([{ _id: mockCourseId, courseName: 'C' }]) }) });
-    mockExamModel.countDocuments.mockReturnValue({ exec: jest.fn().mockResolvedValue(1) });
-    mockExamModel.find.mockReturnValue({ sort: jest.fn().mockReturnValue({ skip: jest.fn().mockReturnValue({ limit: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([{ _id: mockExamId, courseId: mockCourseId, title: 'Exam 6', startTime: new Date(), endTime: new Date() }]) }) }) }) });
-
-    const result = await service.listExamSummaries(undefined, { search: 'Test' } as any);
-    expect(result).toBeDefined();
-    expect(mockExamModel.find).toHaveBeenCalled();
-  });
-
-  // TC_listExamSummaries_008
-  // Method: listExamSummaries
-  // Purpose: To list exam summaries variation 8
-  // Input: courseId, user DTO
-  // Expected output: array of exam summaries
-  // Test result: pass
-  // Note: Fetching lists
-  // checkdb: Mocked DB find.
-  // rollback: jest.clearAllMocks()
-  it('TC_listExamSummaries_008', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockCourseModel.find.mockReturnValue({ select: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([{ _id: mockCourseId, courseName: 'C' }]) }) });
-    mockExamModel.countDocuments.mockReturnValue({ exec: jest.fn().mockResolvedValue(1) });
-    mockExamModel.find.mockReturnValue({ sort: jest.fn().mockReturnValue({ skip: jest.fn().mockReturnValue({ limit: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([{ _id: mockExamId, courseId: mockCourseId, title: 'Exam 7', startTime: new Date(), endTime: new Date() }]) }) }) }) });
-
-    const result = await service.listExamSummaries(undefined, { search: 'Test' } as any);
-    expect(result).toBeDefined();
-    expect(mockExamModel.find).toHaveBeenCalled();
-  });
-
-  // TC_listExamSummaries_009
-  // Method: listExamSummaries
-  // Purpose: To list exam summaries variation 9
-  // Input: courseId, user DTO
-  // Expected output: array of exam summaries
-  // Test result: pass
-  // Note: Fetching lists
-  // checkdb: Mocked DB find.
-  // rollback: jest.clearAllMocks()
-  it('TC_listExamSummaries_009', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockCourseModel.find.mockReturnValue({ select: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([{ _id: mockCourseId, courseName: 'C' }]) }) });
-    mockExamModel.countDocuments.mockReturnValue({ exec: jest.fn().mockResolvedValue(1) });
-    mockExamModel.find.mockReturnValue({ sort: jest.fn().mockReturnValue({ skip: jest.fn().mockReturnValue({ limit: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([{ _id: mockExamId, courseId: mockCourseId, title: 'Exam 8', startTime: new Date(), endTime: new Date() }]) }) }) }) });
-
-    const result = await service.listExamSummaries(undefined, { search: 'Test' } as any);
-    expect(result).toBeDefined();
-    expect(mockExamModel.find).toHaveBeenCalled();
-  });
-
-  // TC_listExamSummaries_010
-  // Method: listExamSummaries
-  // Purpose: To list exam summaries variation 10
-  // Input: courseId, user DTO
-  // Expected output: array of exam summaries
-  // Test result: pass
-  // Note: Fetching lists
-  // checkdb: Mocked DB find.
-  // rollback: jest.clearAllMocks()
-  it('TC_listExamSummaries_010', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockCourseModel.find.mockReturnValue({ select: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([{ _id: mockCourseId, courseName: 'C' }]) }) });
-    mockExamModel.countDocuments.mockReturnValue({ exec: jest.fn().mockResolvedValue(1) });
-    mockExamModel.find.mockReturnValue({ sort: jest.fn().mockReturnValue({ skip: jest.fn().mockReturnValue({ limit: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([{ _id: mockExamId, courseId: mockCourseId, title: 'Exam 9', startTime: new Date(), endTime: new Date() }]) }) }) }) });
-
-    const result = await service.listExamSummaries(undefined, { search: 'Test' } as any);
-    expect(result).toBeDefined();
-    expect(mockExamModel.find).toHaveBeenCalled();
-  });
-
-  // TC_listExamSummaries_011
-  // Method: listExamSummaries
-  // Purpose: To list exam summaries variation 11
-  // Input: courseId, user DTO
-  // Expected output: array of exam summaries
-  // Test result: pass
-  // Note: Fetching lists
-  // checkdb: Mocked DB find.
-  // rollback: jest.clearAllMocks()
-  it('TC_listExamSummaries_011', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockCourseModel.find.mockReturnValue({ select: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([{ _id: mockCourseId, courseName: 'C' }]) }) });
-    mockExamModel.countDocuments.mockReturnValue({ exec: jest.fn().mockResolvedValue(1) });
-    mockExamModel.find.mockReturnValue({ sort: jest.fn().mockReturnValue({ skip: jest.fn().mockReturnValue({ limit: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([{ _id: mockExamId, courseId: mockCourseId, title: 'Exam 10', startTime: new Date(), endTime: new Date() }]) }) }) }) });
-
-    const result = await service.listExamSummaries(undefined, { search: 'Test' } as any);
-    expect(result).toBeDefined();
-    expect(mockExamModel.find).toHaveBeenCalled();
-  });
-
-  // TC_listExamSummaries_012
-  // Method: listExamSummaries
-  // Purpose: To list exam summaries variation 12
-  // Input: courseId, user DTO
-  // Expected output: array of exam summaries
-  // Test result: pass
-  // Note: Fetching lists
-  // checkdb: Mocked DB find.
-  // rollback: jest.clearAllMocks()
-  it('TC_listExamSummaries_012', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockCourseModel.find.mockReturnValue({ select: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([{ _id: mockCourseId, courseName: 'C' }]) }) });
-    mockExamModel.countDocuments.mockReturnValue({ exec: jest.fn().mockResolvedValue(1) });
-    mockExamModel.find.mockReturnValue({ sort: jest.fn().mockReturnValue({ skip: jest.fn().mockReturnValue({ limit: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([{ _id: mockExamId, courseId: mockCourseId, title: 'Exam 11', startTime: new Date(), endTime: new Date() }]) }) }) }) });
-
-    const result = await service.listExamSummaries(undefined, { search: 'Test' } as any);
-    expect(result).toBeDefined();
-    expect(mockExamModel.find).toHaveBeenCalled();
-  });
-
-  // TC_listExamSummaries_013
-  // Method: listExamSummaries
-  // Purpose: To list exam summaries variation 13
-  // Input: courseId, user DTO
-  // Expected output: array of exam summaries
-  // Test result: pass
-  // Note: Fetching lists
-  // checkdb: Mocked DB find.
-  // rollback: jest.clearAllMocks()
-  it('TC_listExamSummaries_013', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockCourseModel.find.mockReturnValue({ select: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([{ _id: mockCourseId, courseName: 'C' }]) }) });
-    mockExamModel.countDocuments.mockReturnValue({ exec: jest.fn().mockResolvedValue(1) });
-    mockExamModel.find.mockReturnValue({ sort: jest.fn().mockReturnValue({ skip: jest.fn().mockReturnValue({ limit: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([{ _id: mockExamId, courseId: mockCourseId, title: 'Exam 12', startTime: new Date(), endTime: new Date() }]) }) }) }) });
-
-    const result = await service.listExamSummaries(undefined, { search: 'Test' } as any);
-    expect(result).toBeDefined();
-    expect(mockExamModel.find).toHaveBeenCalled();
-  });
-
-  // TC_listExamSummaries_014
-  // Method: listExamSummaries
-  // Purpose: To list exam summaries variation 14
-  // Input: courseId, user DTO
-  // Expected output: array of exam summaries
-  // Test result: pass
-  // Note: Fetching lists
-  // checkdb: Mocked DB find.
-  // rollback: jest.clearAllMocks()
-  it('TC_listExamSummaries_014', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockCourseModel.find.mockReturnValue({ select: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([{ _id: mockCourseId, courseName: 'C' }]) }) });
-    mockExamModel.countDocuments.mockReturnValue({ exec: jest.fn().mockResolvedValue(1) });
-    mockExamModel.find.mockReturnValue({ sort: jest.fn().mockReturnValue({ skip: jest.fn().mockReturnValue({ limit: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([{ _id: mockExamId, courseId: mockCourseId, title: 'Exam 13', startTime: new Date(), endTime: new Date() }]) }) }) }) });
-
-    const result = await service.listExamSummaries(undefined, { search: 'Test' } as any);
-    expect(result).toBeDefined();
-    expect(mockExamModel.find).toHaveBeenCalled();
-  });
-
-  // TC_listExamSummaries_015
-  // Method: listExamSummaries
-  // Purpose: To list exam summaries variation 15
-  // Input: courseId, user DTO
-  // Expected output: array of exam summaries
-  // Test result: pass
-  // Note: Fetching lists
-  // checkdb: Mocked DB find.
-  // rollback: jest.clearAllMocks()
-  it('TC_listExamSummaries_015', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockCourseModel.find.mockReturnValue({ select: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([{ _id: mockCourseId, courseName: 'C' }]) }) });
-    mockExamModel.countDocuments.mockReturnValue({ exec: jest.fn().mockResolvedValue(1) });
-    mockExamModel.find.mockReturnValue({ sort: jest.fn().mockReturnValue({ skip: jest.fn().mockReturnValue({ limit: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue([{ _id: mockExamId, courseId: mockCourseId, title: 'Exam 14', startTime: new Date(), endTime: new Date() }]) }) }) }) });
-
-    const result = await service.listExamSummaries(undefined, { search: 'Test' } as any);
-    expect(result).toBeDefined();
-    expect(mockExamModel.find).toHaveBeenCalled();
-  });
-
-
-  // TC_findExamById_001
-  // Method: findExamById
-  // Purpose: To find exam by ID variation 1
-  // Input: examId, user DTO
-  // Expected output: exam detail object
-  // Test result: pass
-  // Note: Single fetch
-  // checkdb: Mocked DB findOne.
-  // rollback: jest.clearAllMocks()
-  it('TC_findExamById_001', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId, title: 'Exam Detail 0', questions: [] }) });
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.find.mockReturnValue({ exec: jest.fn().mockResolvedValue([]) });
-
-    const result = await service.findExamById(mockExamId.toHexString(), mockUser as any);
-    expect(result).toBeDefined();
-    expect(mockExamModel.findOne).toHaveBeenCalled();
-  });
-
-  // TC_findExamById_002
-  // Method: findExamById
-  // Purpose: To find exam by ID variation 2
-  // Input: examId, user DTO
-  // Expected output: exam detail object
-  // Test result: pass
-  // Note: Single fetch
-  // checkdb: Mocked DB findOne.
-  // rollback: jest.clearAllMocks()
-  it('TC_findExamById_002', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId, title: 'Exam Detail 1', questions: [] }) });
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.find.mockReturnValue({ exec: jest.fn().mockResolvedValue([]) });
-
-    const result = await service.findExamById(mockExamId.toHexString(), mockUser as any);
-    expect(result).toBeDefined();
-    expect(mockExamModel.findOne).toHaveBeenCalled();
-  });
-
-  // TC_findExamById_003
-  // Method: findExamById
-  // Purpose: To find exam by ID variation 3
-  // Input: examId, user DTO
-  // Expected output: exam detail object
-  // Test result: pass
-  // Note: Single fetch
-  // checkdb: Mocked DB findOne.
-  // rollback: jest.clearAllMocks()
-  it('TC_findExamById_003', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId, title: 'Exam Detail 2', questions: [] }) });
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.find.mockReturnValue({ exec: jest.fn().mockResolvedValue([]) });
-
-    const result = await service.findExamById(mockExamId.toHexString(), mockUser as any);
-    expect(result).toBeDefined();
-    expect(mockExamModel.findOne).toHaveBeenCalled();
-  });
-
-  // TC_findExamById_004
-  // Method: findExamById
-  // Purpose: To find exam by ID variation 4
-  // Input: examId, user DTO
-  // Expected output: exam detail object
-  // Test result: pass
-  // Note: Single fetch
-  // checkdb: Mocked DB findOne.
-  // rollback: jest.clearAllMocks()
-  it('TC_findExamById_004', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId, title: 'Exam Detail 3', questions: [] }) });
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.find.mockReturnValue({ exec: jest.fn().mockResolvedValue([]) });
-
-    const result = await service.findExamById(mockExamId.toHexString(), mockUser as any);
-    expect(result).toBeDefined();
-    expect(mockExamModel.findOne).toHaveBeenCalled();
-  });
-
-  // TC_findExamById_005
-  // Method: findExamById
-  // Purpose: To find exam by ID variation 5
-  // Input: examId, user DTO
-  // Expected output: exam detail object
-  // Test result: pass
-  // Note: Single fetch
-  // checkdb: Mocked DB findOne.
-  // rollback: jest.clearAllMocks()
-  it('TC_findExamById_005', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId, title: 'Exam Detail 4', questions: [] }) });
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.find.mockReturnValue({ exec: jest.fn().mockResolvedValue([]) });
-
-    const result = await service.findExamById(mockExamId.toHexString(), mockUser as any);
-    expect(result).toBeDefined();
-    expect(mockExamModel.findOne).toHaveBeenCalled();
-  });
-
-  // TC_findExamById_006
-  // Method: findExamById
-  // Purpose: To find exam by ID variation 6
-  // Input: examId, user DTO
-  // Expected output: exam detail object
-  // Test result: pass
-  // Note: Single fetch
-  // checkdb: Mocked DB findOne.
-  // rollback: jest.clearAllMocks()
-  it('TC_findExamById_006', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId, title: 'Exam Detail 5', questions: [] }) });
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.find.mockReturnValue({ exec: jest.fn().mockResolvedValue([]) });
-
-    const result = await service.findExamById(mockExamId.toHexString(), mockUser as any);
-    expect(result).toBeDefined();
-    expect(mockExamModel.findOne).toHaveBeenCalled();
-  });
-
-  // TC_findExamById_007
-  // Method: findExamById
-  // Purpose: To find exam by ID variation 7
-  // Input: examId, user DTO
-  // Expected output: exam detail object
-  // Test result: pass
-  // Note: Single fetch
-  // checkdb: Mocked DB findOne.
-  // rollback: jest.clearAllMocks()
-  it('TC_findExamById_007', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId, title: 'Exam Detail 6', questions: [] }) });
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.find.mockReturnValue({ exec: jest.fn().mockResolvedValue([]) });
-
-    const result = await service.findExamById(mockExamId.toHexString(), mockUser as any);
-    expect(result).toBeDefined();
-    expect(mockExamModel.findOne).toHaveBeenCalled();
-  });
-
-  // TC_findExamById_008
-  // Method: findExamById
-  // Purpose: To find exam by ID variation 8
-  // Input: examId, user DTO
-  // Expected output: exam detail object
-  // Test result: pass
-  // Note: Single fetch
-  // checkdb: Mocked DB findOne.
-  // rollback: jest.clearAllMocks()
-  it('TC_findExamById_008', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId, title: 'Exam Detail 7', questions: [] }) });
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.find.mockReturnValue({ exec: jest.fn().mockResolvedValue([]) });
-
-    const result = await service.findExamById(mockExamId.toHexString(), mockUser as any);
-    expect(result).toBeDefined();
-    expect(mockExamModel.findOne).toHaveBeenCalled();
-  });
-
-  // TC_findExamById_009
-  // Method: findExamById
-  // Purpose: To find exam by ID variation 9
-  // Input: examId, user DTO
-  // Expected output: exam detail object
-  // Test result: pass
-  // Note: Single fetch
-  // checkdb: Mocked DB findOne.
-  // rollback: jest.clearAllMocks()
-  it('TC_findExamById_009', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId, title: 'Exam Detail 8', questions: [] }) });
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.find.mockReturnValue({ exec: jest.fn().mockResolvedValue([]) });
-
-    const result = await service.findExamById(mockExamId.toHexString(), mockUser as any);
-    expect(result).toBeDefined();
-    expect(mockExamModel.findOne).toHaveBeenCalled();
-  });
-
-  // TC_findExamById_010
-  // Method: findExamById
-  // Purpose: To find exam by ID variation 10
-  // Input: examId, user DTO
-  // Expected output: exam detail object
-  // Test result: pass
-  // Note: Single fetch
-  // checkdb: Mocked DB findOne.
-  // rollback: jest.clearAllMocks()
-  it('TC_findExamById_010', async () => {
-    const mockUser = { id: mockTeacherId.toHexString(), role: 'teacher' };
-    mockExamModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: mockExamId, courseId: mockCourseId, title: 'Exam Detail 9', questions: [] }) });
-    mockCourseModel.findById.mockResolvedValue({ _id: mockCourseId, teacherId: mockTeacherId });
-    mockQuestionModel.find.mockReturnValue({ exec: jest.fn().mockResolvedValue([]) });
-
-    const result = await service.findExamById(mockExamId.toHexString(), mockUser as any);
-    expect(result).toBeDefined();
-    expect(mockExamModel.findOne).toHaveBeenCalled();
-  });
-
 });

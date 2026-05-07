@@ -70,7 +70,7 @@ export const FaceVerificationModal = ({
   }, [isOpen]);
 
   // Hàm xử lý xác thực Local bằng face-api.js
-  const handleVerifyFace = async () => {
+  const handleVerifyFace = async () => { console.log("handleVerifyFace called", !!videoRef.current, user, modelsLoaded);
     if (!videoRef.current || !user?.imageUrl) {
       setError('System is not ready or profile image is missing.');
       return;
@@ -87,12 +87,12 @@ export const FaceVerificationModal = ({
     try {
       // 1. Phát hiện khuôn mặt từ WEBCAM
       // Sử dụng SsdMobilenetv1 cho độ chính xác cao
-      const webcamDetection = await faceapi
+      console.log("Detecting webcam"); const webcamDetection = await faceapi
         .detectSingleFace(videoRef.current, new faceapi.SsdMobilenetv1Options())
         .withFaceLandmarks()
         .withFaceDescriptor();
 
-      if (!webcamDetection) {
+      console.log("Webcam detection done", webcamDetection); if (!webcamDetection) {
         throw new Error('No face detected in camera. Please adjust your position.');
       }
 
